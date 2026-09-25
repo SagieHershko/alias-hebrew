@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "אליאס",
+    "slug": "alias-hebrew",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#E30613",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E30613"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.aliashebrew"
+    },
+    "android": {
+      "package": "com.example.aliashebrew",
+      "adaptiveIcon": {
+        "backgroundColor": "#E30613",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": true,
+          "supportedLocales": ["he"]
+        }
+      ]
+    ]
+  }
+}

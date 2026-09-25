@@ -1,0 +1,253 @@
+import { useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { AliasLogo } from '../components/AliasLogo';
+import { BigButton } from '../components/BigButton';
+import { MAX_TEAMS, MIN_TEAMS } from '../game/gameReducer';
+import { useGame } from '../game/GameContext';
+import { colors, radius, TEAM_COLORS } from '../theme';
+
+const SUGGESTED_NAMES = ['האריות', 'הנשרים', 'הכרישים', 'הנמרים', 'הדובים', 'הזאבים'];
+const TARGET_OPTIONS = [20, 30, 40, 50];
+const SECONDS_OPTIONS = [30, 45, 60];
+
+const RULES = [
+  'מתחלקים ל־2 עד 6 קבוצות (4 עד 12 שחקנים).',
+  'בכל תור שחקן אחד מסביר לחברי הקבוצה כמה שיותר מילים עד שהזמן נגמר.',
+  'מותר להשתמש במילים נרדפות, הפכים, רמזים ואסוציאציות.',
+  'אסור להגיד את המילה עצמה או כל חלק ממנה!',
+  'כל מילה שנוחשה נכון = צעד אחד קדימה על הלוח.',
+  'כשהזמן נגמר – המילה האחרונה עוד ניתנת לניחוש.',
+  'הקבוצה הראשונה שמגיעה למשבצת הסיום – מנצחת!',
+];
+
+export function SetupScreen() {
+  const { state, dispatch } = useGame();
+  const insets = useSafeAreaInsets();
+  const [names, setNames] = useState<string[]>(() =>
+    state.teams.length >= MIN_TEAMS ? state.teams.map((t) => t.name) : SUGGESTED_NAMES.slice(0, 2),
+  );
+  const [target, setTarget] = useState(state.settings.targetScore);
+  const [seconds, setSeconds] = useState(state.settings.turnSeconds);
+  const [skipPenalty, setSkipPenalty] = useState(state.settings.skipPenalty);
+  const [showRules, setShowRules] = useState(false);
+
+  const trimmed = names.map((n) => n.trim());
+  const hasEmpty = trimmed.some((n) => n.length === 0);
+  const hasDuplicates = new Set(trimmed).size !== trimmed.length;
+  const canStart = names.length >= MIN_TEAMS && !hasEmpty && !hasDuplicates;
+
+  const addTeam = () => {
+    if (names.length >= MAX_TEAMS) return;
+    const unused = SUGGESTED_NAMES.find((s) => !names.includes(s)) ?? `קבוצה ${names.length + 1}`;
+    setNames([...names, unused]);
+  };
+  const removeTeam = (index: number) => {
+    if (names.length <= MIN_TEAMS) return;
+    setNames(names.filter((_, i) => i !== index));
+  };
+  const rename = (index: number, value: string) =>
+    setNames(names.map((n, i) => (i === index ? value : n)));
+
+  const start = () =>
+    dispatch({
+      type: 'START_GAME',
+      teamNames: trimmed,
+      settings: { targetScore: target, turnSeconds: seconds, skipPenalty },
+    });
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.logo}>
+          <AliasLogo size={170} subtitle={'משחק מילים\nלכל המשפחה!'} />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>הקבוצות ({names.length}/{MAX_TEAMS})</Text>
+          {names.map((name, i) => (
+            <View key={i} style={styles.teamRow}>
+              <View style={[styles.pawn, { backgroundColor: TEAM_COLORS[i] }]} />
+              <TextInput
+                value={name}
+                onChangeText={(v) => rename(i, v)}
+                placeholder={`שם קבוצה ${i + 1}`}
+                placeholderTextColor={colors.muted}
+                style={styles.input}
+                maxLength={18}
+                returnKeyType="done"
+                accessibilityLabel={`שם קבוצה ${i + 1}`}
+              />
+              <Pressable
+                onPress={() => removeTeam(i)}
+                disabled={names.length <= MIN_TEAMS}
+                style={({ pressed }) => [
+                  styles.removeBtn,
+                  { opacity: names.length <= MIN_TEAMS ? 0.25 : pressed ? 0.6 : 1 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`הסרת ${name || `קבוצה ${i + 1}`}`}
+              >
+                <Text style={styles.removeText}>✕</Text>
+              </Pressable>
+            </View>
+          ))}
+          {hasDuplicates && <Text style={styles.error}>לכל קבוצה צריך שם אחר</Text>}
+          {names.length < MAX_TEAMS && (
+            <BigButton label="+ הוספת קבוצה" variant="light" onPress={addTeam} style={styles.addBtn} />
+          )}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>הגדרות</Text>
+          <Text style={styles.label}>משבצת הסיום (נקודות לניצחון)</Text>
+          <Chips options={TARGET_OPTIONS} value={target} onChange={setTarget} />
+          <Text style={styles.label}>זמן לכל תור (שניות)</Text>
+          <Chips options={SECONDS_OPTIONS} value={seconds} onChange={setSeconds} />
+          <View style={styles.switchRow}>
+            <Text style={[styles.label, styles.flex]}>דילוג מוריד צעד אחורה</Text>
+            <Switch
+              value={skipPenalty}
+              onValueChange={setSkipPenalty}
+              trackColor={{ true: colors.red, false: '#ccc' }}
+              thumbColor={colors.white}
+            />
+          </View>
+        </View>
+
+        <Pressable onPress={() => setShowRules((s) => !s)} style={styles.rulesToggle}>
+          <Text style={styles.rulesToggleText}>{showRules ? '▲' : '▼'} איך משחקים?</Text>
+        </Pressable>
+        {showRules && (
+          <View style={styles.card}>
+            {RULES.map((r, i) => (
+              <Text key={i} style={styles.rule}>
+                • {r}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        <BigButton label="יאללה, מתחילים!" variant="light" large disabled={!canStart} onPress={start} />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function Chips({
+  options,
+  value,
+  onChange,
+}: {
+  options: number[];
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <View style={styles.chips}>
+      {options.map((o) => {
+        const selected = o === value;
+        return (
+          <Pressable
+            key={o}
+            onPress={() => onChange(o)}
+            style={[styles.chip, selected && styles.chipSelected]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+          >
+            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{o}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  content: { paddingHorizontal: 16, gap: 16 },
+  logo: { alignItems: 'center', marginBottom: 4 },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: 16,
+    gap: 10,
+  },
+  cardTitle: { fontSize: 22, fontWeight: '900', color: colors.red },
+  teamRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pawn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.white,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  input: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+    backgroundColor: colors.offWhite,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: '#F1C6C9',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    writingDirection: 'rtl',
+  },
+  removeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeText: { color: colors.red, fontSize: 16, fontWeight: '900' },
+  addBtn: { marginTop: 4, borderColor: colors.red, borderStyle: 'dashed' },
+  error: { color: colors.skip, fontWeight: '700' },
+  label: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  chips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  chip: {
+    minWidth: 56,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.red,
+    alignItems: 'center',
+  },
+  chipSelected: { backgroundColor: colors.red },
+  chipText: { color: colors.red, fontWeight: '800', fontSize: 16 },
+  chipTextSelected: { color: colors.white },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rulesToggle: { alignSelf: 'center', padding: 6 },
+  rulesToggleText: { color: colors.white, fontSize: 18, fontWeight: '800' },
+  rule: { fontSize: 16, lineHeight: 24, color: colors.ink },
+});

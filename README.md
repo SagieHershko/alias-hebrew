@@ -1,0 +1,88 @@
+# אליאס – Alias (Hebrew)
+
+A digital, Hebrew-only, right-to-left version of the family word game **אליאס**, built with React Native, Expo (SDK 57) and TypeScript.
+
+<p>
+  <img src="docs/screenshots/1-setup.png" width="180" alt="מסך פתיחה" />
+  <img src="docs/screenshots/2-board.png" width="180" alt="לוח המשחק" />
+  <img src="docs/screenshots/3-game.png" width="180" alt="תור פעיל" />
+  <img src="docs/screenshots/5-summary.png" width="180" alt="סיכום תור" />
+</p>
+
+## How to play (איך משחקים)
+
+- 4–12 players split into 2–6 teams.
+- On each turn one player explains as many words as possible before the timer runs out (60 seconds by default).
+- The explainer may use synonyms, antonyms, hints and associations, but may **never** say the word or any part of it.
+- Every correct word is one step forward on the board. The first team to reach the finish square wins.
+- When time runs out, everyone at the table can still guess the last word on screen.
+- Optional classic rule: a skipped word moves the team one step back.
+
+## Run it
+
+```bash
+npm install
+npx expo start          # then scan the QR code with Expo Go, or press a / i / w
+```
+
+### Bootstrap from scratch (how this project was created)
+
+```bash
+npx create-expo-app@latest alias-hebrew --template blank-typescript
+cd alias-hebrew
+npx expo install expo-localization expo-haptics react-native-safe-area-context
+npx expo install react-dom react-native-web @expo/metro-runtime   # optional: web support
+```
+
+Then copy in `App.tsx`, `index.ts`, `app.json` and the `src/` folder from this repository.
+
+## RTL (right-to-left)
+
+RTL is applied in three layers so it holds in every environment:
+
+1. **`app.json`**: the `expo-localization` plugin sets `supportsRTL` and `forcesRTL`, so dev and production builds start in RTL.
+2. **`index.ts`**: calls `I18nManager.allowRTL(true)` and `I18nManager.forceRTL(true)` at startup. In Expo Go this takes effect from the next launch.
+3. **`App.tsx`**: the root view has `direction: 'rtl'`, so the layout is right-to-left from the very first frame, including on web.
+
+## Folder structure
+
+```
+alias-hebrew/
+├── App.tsx                     # Providers + chooses the screen from the game phase
+├── index.ts                    # Entry point, forces RTL
+├── app.json                    # Expo config (red splash, RTL plugin)
+└── src/
+    ├── theme.ts                # Red and white palette, team pawn colours
+    ├── data/words.ts           # Hebrew word bank (~150 words)
+    ├── game/
+    │   ├── types.ts            # GameState, Team, actions
+    │   ├── gameReducer.ts      # All game rules: turns, scoring, deck, winning
+    │   └── GameContext.tsx     # useReducer + React context
+    ├── hooks/useCountdown.ts   # Drift-free countdown timer with pause
+    ├── components/
+    │   ├── AliasLogo.tsx       # Speech-bubble logo
+    │   ├── BigButton.tsx
+    │   ├── DigitalBoard.tsx    # Red board with numbered white squares and pawns
+    │   └── TeamProgress.tsx    # Score, progress bar, steps left to the finish
+    └── screens/
+        ├── SetupScreen.tsx     # Teams (2–6), target, turn length, rules
+        ├── ScoreboardScreen.tsx# Digital board between turns, who plays next
+        ├── GameScreen.tsx      # Timer, word card, נכון / דלג/טעות (+ swipe)
+        ├── TurnSummaryScreen.tsx # Review and correct the turn's words
+        └── WinnerScreen.tsx
+```
+
+## Game flow
+
+`setup → scoreboard → turn → summary → scoreboard → … → winner`
+
+All state lives in a single reducer (`src/game/gameReducer.ts`):
+
+- **Deck**: the word bank is shuffled once per game and drawn without repeats. When the deck runs out it is reshuffled.
+- **Turn switching**: after each confirmed turn, play passes to the next team. The round counter goes up when play returns to the first team.
+- **Scoring**: +1 per correct word (and optionally −1 per skip). Positions are clamped between 0 and the finish square.
+- **Winning**: a team that reaches the finish square wins immediately.
+
+## Adding words
+
+Add strings to `RAW_WORDS` in `src/data/words.ts`. Duplicates are removed automatically.
