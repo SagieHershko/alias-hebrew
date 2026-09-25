@@ -13,6 +13,10 @@ export interface Team {
 export interface TurnWord {
   word: string;
   result: WordResult;
+  /** The word on screen when time ran out; any team may guess it. */
+  isLastWord?: boolean;
+  /** Last word only: the team that guessed it, or null if nobody did. */
+  guessedBy?: string | null;
 }
 
 export interface Settings {
@@ -40,7 +44,9 @@ export interface GameState {
 export type GameAction =
   | { type: 'START_GAME'; teamNames: string[]; settings: Settings }
   | { type: 'BEGIN_TURN' }
-  | { type: 'ANSWER'; result: WordResult; isLastWord?: boolean }
+  | { type: 'ANSWER'; result: WordResult }
+  | { type: 'LAST_WORD'; teamId: string | null }
+  | { type: 'CYCLE_LAST_WORD' }
   | { type: 'END_TURN' }
   | { type: 'TOGGLE_WORD'; index: number }
   | { type: 'CONFIRM_TURN' }

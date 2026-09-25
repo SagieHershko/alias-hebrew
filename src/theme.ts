@@ -27,6 +27,13 @@ export const TEAM_COLORS = [
 
 export const TEAM_COLOR_NAMES = ['צהוב', 'כחול', 'ירוק', 'שחור', 'סגול', 'כתום'] as const;
 
+/** Dark text on light pawn colours (yellow), white text on the rest. */
+export function readableOn(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const luminance = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+  return luminance > 150 ? colors.ink : colors.white;
+}
+
 export const radius = { sm: 10, md: 16, lg: 24, pill: 999 } as const;
 
 export const shadow = {

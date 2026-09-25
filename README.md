@@ -15,7 +15,7 @@ A digital, Hebrew-only, right-to-left version of the family word game **אליא
 - On each turn one player explains as many words as possible before the timer runs out (60 seconds by default).
 - The explainer may use synonyms, antonyms, hints and associations, but may **never** say the word or any part of it.
 - Every correct word is one step forward on the board. The first team to reach the finish square wins.
-- When time runs out, everyone at the table can still guess the last word on screen.
+- When time runs out, every team can guess the last word on screen. Tap the team that guessed it (or "אף אחד") and that team moves one step forward.
 - Optional classic rule: a skipped word moves the team one step back.
 
 ## Run it
@@ -89,8 +89,8 @@ All state lives in a single reducer (`src/game/gameReducer.ts`):
 
 - **Deck**: the word bank is shuffled once per game and drawn without repeats. When the deck runs out it is reshuffled.
 - **Turn switching**: after each confirmed turn, play passes to the next team. The round counter goes up when play returns to the first team.
-- **Scoring**: +1 per correct word (and optionally −1 per skip). Positions are clamped between 0 and the finish square.
-- **Winning**: a team that reaches the finish square wins immediately.
+- **Scoring**: +1 per correct word (and optionally −1 per skip). The last word gives +1 to whichever team guessed it, and is never penalised. Positions are clamped between 0 and the finish square.
+- **Winning**: a team that reaches the finish square wins immediately. If the explaining team and a team that stole the last word both reach it in the same turn, the explaining team wins.
 
 ## Adding words
 

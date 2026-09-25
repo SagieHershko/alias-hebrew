@@ -8,7 +8,7 @@ import { currentTeam, turnPoints } from '../game/gameReducer';
 import { useGame } from '../game/GameContext';
 import type { WordResult } from '../game/types';
 import { useCountdown } from '../hooks/useCountdown';
-import { colors, radius, shadow } from '../theme';
+import { colors, radius, readableOn, shadow } from '../theme';
 
 const SWIPE_THRESHOLD = 90;
 
@@ -32,14 +32,25 @@ export function GameScreen() {
 
   const correctCount = state.turnWords.filter((w) => w.result === 'correct').length;
   const skippedCount = state.turnWords.length - correctCount;
-  const points = turnPoints(state.turnWords, state.settings);
+  const points = turnPoints(state.turnWords, state.settings, team.id);
+  // The explaining team first, then everyone else.
+  const guessers = [team, ...state.teams.filter((t) => t.id !== team.id)];
 
   // Keep the latest handler reachable from the (stable) PanResponder.
   const answerRef = useRef<(r: WordResult) => void>(() => {});
   const answer = (result: WordResult) => {
     if (timer.paused || state.currentWord === null) return;
+    if (lastWord) {
+      // Swiping on the last word: up = the explaining team got it, down = nobody.
+      awardLastWord(result === 'correct' ? team.id : null);
+      return;
+    }
     buzz(result);
-    dispatch({ type: 'ANSWER', result, isLastWord: lastWord });
+    dispatch({ type: 'ANSWER', result });
+  };
+  const awardLastWord = (teamId: string | null) => {
+    buzz(teamId ? 'correct' : 'skipped');
+    dispatch({ type: 'LAST_WORD', teamId });
   };
   answerRef.current = answer;
 
@@ -138,31 +149,48 @@ export function GameScreen() {
       </View>
 
       {/* ── Actions ─────────────────────────── */}
-      <View style={styles.actions}>
-        <BigButton
-          label="נכון"
-          variant="correct"
-          large
-          onPress={() => answer('correct')}
-          disabled={timer.paused}
-          style={styles.flex}
-        />
-        <BigButton
-          label="דלג/טעות"
-          variant="skip"
-          large
-          onPress={() => answer('skipped')}
-          disabled={timer.paused}
-          style={styles.flex}
-        />
-      </View>
-      {lastWord && (
-        <BigButton
-          label="אף אחד לא ניחש – סיום התור"
-          variant="ghost"
-          onPress={() => dispatch({ type: 'END_TURN' })}
-          style={styles.endBtn}
-        />
+      {lastWord ? (
+        <View style={styles.guessers}>
+          <Text style={styles.guessersTitle}>מי ניחש את המילה?</Text>
+          <View style={styles.guesserRow}>
+            {guessers.map((t) => (
+              <Pressable
+                key={t.id}
+                onPress={() => awardLastWord(t.id)}
+                style={({ pressed }) => [
+                  styles.guesserBtn,
+                  { backgroundColor: t.color, opacity: pressed ? 0.75 : 1 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${t.name} ניחשו, נקודה ל${t.name}`}
+              >
+                <Text style={[styles.guesserText, { color: readableOn(t.color) }]} numberOfLines={1}>
+                  {t.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <BigButton label="אף אחד לא ניחש" variant="ghost" onPress={() => awardLastWord(null)} />
+        </View>
+      ) : (
+        <View style={styles.actions}>
+          <BigButton
+            label="נכון"
+            variant="correct"
+            large
+            onPress={() => answer('correct')}
+            disabled={timer.paused}
+            style={styles.flex}
+          />
+          <BigButton
+            label="דלג/טעות"
+            variant="skip"
+            large
+            onPress={() => answer('skipped')}
+            disabled={timer.paused}
+            style={styles.flex}
+          />
+        </View>
       )}
     </View>
   );
@@ -245,5 +273,20 @@ const styles = StyleSheet.create({
   counters: { flexDirection: 'row', justifyContent: 'center', gap: 32 },
   counter: { color: colors.white, fontSize: 22, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: 12 },
-  endBtn: { marginTop: 2 },
+  guessers: { gap: 10 },
+  guessersTitle: { color: colors.white, fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  guesserRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  guesserBtn: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minHeight: 60,
+    borderRadius: radius.md,
+    borderWidth: 3,
+    borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    ...shadow,
+  },
+  guesserText: { fontSize: 20, fontWeight: '900' },
 });
