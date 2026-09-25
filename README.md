@@ -34,11 +34,11 @@ npx expo install expo-localization expo-haptics react-native-safe-area-context
 npx expo install react-dom react-native-web @expo/metro-runtime   # optional: web support
 ```
 
-Then copy in `App.tsx`, `index.ts`, `app.json` and the `src/` folder from this repository.
+Then copy in `App.tsx`, `index.ts`, `app.json`, `vercel.json` and the `src/` and `public/` folders from this repository.
 
 ## Deploy the web version to Vercel
 
-The repository root has a `vercel.json` that builds this folder as a static web app (`npx expo export --platform web` → `alias-hebrew/dist`).
+`vercel.json` builds the app as a static web app (`npx expo export --platform web` → `dist/`).
 
 - **From the dashboard:** vercel.com → Add New → Project → import the GitHub repo → Deploy. No settings need changing; `vercel.json` provides the install and build commands and the output folder.
 - **From a terminal:** run `npx vercel --prod` in the repository root.
