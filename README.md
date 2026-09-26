@@ -15,6 +15,7 @@ A digital, Hebrew-only, right-to-left version of the family word game **אליא
 
 - 4–12 players split into 2–6 teams.
 - On each turn one player explains as many words as possible before the sand timer runs out (60 seconds by default).
+- **Steal squares** (red with a white ring): a team whose pawn lands on or passes one plays its next turn as a steal turn. Every team guesses at the same time, and each word gives a step to the team that guessed it first, so rivals can steal steps.
 - Every card has 8 numbered words. The number (1–8) of the square your pawn stands on says which word on each card you explain.
 - The explainer may use synonyms, antonyms, hints and associations, but may **never** say the word or any part of it.
 - Every correct word is one step forward on the board. The first team to reach the finish square wins.
@@ -83,7 +84,8 @@ alias-hebrew/
     ├── data/words.ts           # Hebrew word bank (~470 words → 8-word cards)
     ├── game/
     │   ├── types.ts            # GameState, Team, actions
-    │   ├── gameReducer.ts      # All game rules: cards, turns, scoring, winning
+    │   ├── gameReducer.ts      # All game rules: cards, turns, scoring, steal turns, winning
+    │   ├── board.ts            # Where the steal squares are
     │   └── GameContext.tsx     # useReducer + React context
     ├── hooks/useCountdown.ts   # Drift-free countdown with pause and start delay
     ├── three/

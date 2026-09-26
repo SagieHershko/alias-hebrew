@@ -2,7 +2,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
-import { currentTeam, lastWordThief, turnPoints } from '../../game/gameReducer';
+import { currentTeam, turnAwards } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import { colors, radius, readableOn } from '../../theme';
 import { panel } from './panel';
@@ -14,20 +14,25 @@ export function SummaryPanel() {
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: false, bottom: true });
   const team = currentTeam(state)!;
-  const points = turnPoints(state.turnWords, state.settings, team.id);
-  const thiefId = lastWordThief(state.turnWords, team.id);
-  const thief = state.teams.find((t) => t.id === thiefId);
+  const awards = turnAwards(state.turnWords, state.settings, team.id);
+  const points = awards[team.id] ?? 0;
+  // Other teams that stole steps (last word, or any word of a steal turn).
+  const thieves = state.teams.filter((t) => t.id !== team.id && (awards[t.id] ?? 0) > 0);
   const newScore = Math.min(state.settings.targetScore, Math.max(0, team.score + points));
 
   return (
     <View style={panel.layer} pointerEvents="box-none">
       <View style={[panel.bottom, styles.sheet, { paddingBottom: insets.bottom + 14 }]} onLayout={stage.onBottomLayout}>
-        <Text style={styles.title}>נגמר הזמן!</Text>
+        <Text style={styles.title}>{state.stealTurn ? 'נגמר תור הגניבה!' : 'נגמר הזמן!'}</Text>
         <Text style={styles.subtitle}>
           {team.name}: {points >= 0 ? `+${points}` : points} צעדים
         </Text>
         <Text style={styles.help}>עוברים למשבצת {newScore}</Text>
-        {thief && <Text style={styles.steal}>{thief.name} ניחשו את המילה האחרונה: +1 צעד</Text>}
+        {thieves.map((t) => (
+          <Text key={t.id} style={styles.steal}>
+            {t.name} גנבו {awards[t.id] === 1 ? 'צעד אחד' : `${awards[t.id]} צעדים`}
+          </Text>
+        ))}
         <Text style={styles.help}>טעיתם בסימון? הקישו על מילה כדי לשנות</Text>
 
         <FlatList
@@ -37,17 +42,18 @@ export function SummaryPanel() {
           keyExtractor={(item, i) => `${item.word}-${i}`}
           ListEmptyComponent={<Text style={styles.empty}>לא הוצגו מילים בתור הזה</Text>}
           renderItem={({ item, index }) => {
-            if (item.isLastWord) {
+            // Words any team could guess (last word, steal turn): tap to change who guessed it.
+            if (item.guessedBy !== undefined) {
               const guesser = state.teams.find((t) => t.id === item.guessedBy);
               return (
                 <Pressable
-                  onPress={() => dispatch({ type: 'CYCLE_LAST_WORD' })}
-                  style={({ pressed }) => [styles.row, styles.lastRow, pressed && { opacity: 0.7 }]}
+                  onPress={() => dispatch({ type: 'CYCLE_WORD', index })}
+                  style={({ pressed }) => [styles.row, item.isLastWord && styles.lastRow, pressed && { opacity: 0.7 }]}
                   accessibilityRole="button"
-                  accessibilityLabel={`מילה אחרונה ${item.word}, ${guesser ? `ניחשו ${guesser.name}` : 'אף אחד לא ניחש'}. הקשה משנה`}
+                  accessibilityLabel={`${item.word}, ${guesser ? `ניחשו ${guesser.name}` : 'אף אחד לא ניחש'}. הקשה משנה`}
                 >
                   <View style={styles.wordCol}>
-                    <Text style={styles.lastLabel}>מילה אחרונה</Text>
+                    {item.isLastWord && <Text style={styles.lastLabel}>מילה אחרונה</Text>}
                     <Text style={styles.word}>{item.word}</Text>
                   </View>
                   <View style={[styles.badge, { backgroundColor: guesser?.color ?? colors.muted }]}>

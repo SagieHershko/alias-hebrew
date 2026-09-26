@@ -82,14 +82,36 @@ export function TurnPanel({ sand, onCardShown }: Props) {
   const points = turnPoints(state.turnWords, state.settings, team.id);
   // The explaining team first, then everyone else.
   const guessers = [team, ...state.teams.filter((t) => t.id !== team.id)];
-  const title = `${team.name} מסבירים · מילה ${state.wordIndex + 1}`;
+  const title = `${team.name} מסבירים · מילה ${state.wordIndex + 1}${state.stealTurn ? ' · תור גניבה' : ''}`;
 
-  const answer = (result: WordResult) => {
+  const answer = (result: WordResult, teamId?: string) => {
     if (timer.paused || !state.currentCard) return;
     buzz(result);
     setLeaving((cards) => [...cards, { key: state.cardsDrawn, words: state.currentCard!, result }]);
-    dispatch({ type: 'ANSWER', result });
+    dispatch({ type: 'ANSWER', result, teamId });
   };
+  /** One button per team, in its pawn colour (explaining team first). */
+  const teamButtons = (onPick: (teamId: string) => void, disabled = false) => (
+    <View style={styles.guesserRow}>
+      {guessers.map((t) => (
+        <Pressable
+          key={t.id}
+          onPress={() => onPick(t.id)}
+          disabled={disabled}
+          style={({ pressed }) => [
+            styles.guesserBtn,
+            { backgroundColor: t.color, opacity: disabled ? 0.45 : pressed ? 0.75 : 1 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`${t.name} ניחשו, צעד ל${t.name}`}
+        >
+          <Text style={[styles.guesserText, { color: readableOn(t.color) }]} numberOfLines={1}>
+            {t.name}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
   const awardLastWord = (teamId: string | null) => {
     buzz(teamId ? 'correct' : 'skipped');
     dispatch({ type: 'LAST_WORD', teamId });
@@ -161,25 +183,15 @@ export function TurnPanel({ sand, onCardShown }: Props) {
           {lastWord ? (
             <>
               <Text style={styles.lastTitle}>החול נגמר! מילה אחרונה – מי ניחש?</Text>
-              <View style={styles.guesserRow}>
-                {guessers.map((t) => (
-                  <Pressable
-                    key={t.id}
-                    onPress={() => awardLastWord(t.id)}
-                    style={({ pressed }) => [
-                      styles.guesserBtn,
-                      { backgroundColor: t.color, opacity: pressed ? 0.75 : 1 },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t.name} ניחשו, נקודה ל${t.name}`}
-                  >
-                    <Text style={[styles.guesserText, { color: readableOn(t.color) }]} numberOfLines={1}>
-                      {t.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <BigButton label="אף אחד לא ניחש" variant="ghost" onPress={() => awardLastWord(null)} />
+              {teamButtons(awardLastWord)}
+              <BigButton label="אף אחד לא ניחש" variant="skip" onPress={() => awardLastWord(null)} />
+            </>
+          ) : state.stealTurn ? (
+            <>
+              {/* Steal turn: every team guesses; tap the team that got the word first. */}
+              <Text style={styles.lastTitle}>תור גניבה! מי ניחש ראשון?</Text>
+              {teamButtons((teamId) => answer('correct', teamId), timer.paused)}
+              <BigButton label="דלג/טעות" variant="skip" onPress={() => answer('skipped')} disabled={timer.paused} />
             </>
           ) : (
             <View style={panel.row}>
@@ -299,8 +311,8 @@ const styles = StyleSheet.create({
   guesserRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   guesserBtn: {
     flexGrow: 1,
-    flexBasis: '45%',
-    minHeight: 56,
+    flexBasis: '30%',
+    minHeight: 50,
     borderRadius: radius.md,
     borderWidth: 3,
     borderColor: colors.white,

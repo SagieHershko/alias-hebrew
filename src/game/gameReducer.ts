@@ -1,5 +1,6 @@
 import { WORDS, WORDS_PER_CARD } from '../data/words';
 import { TEAM_COLORS } from '../theme';
+import { crossesStealSquare } from './board';
 import type { GameAction, GameState, Settings, Team, TurnWord } from './types';
 
 export const MIN_TEAMS = 2;
@@ -25,6 +26,7 @@ export const initialState: GameState = {
   turnWords: [],
   winnerId: null,
   previousScores: {},
+  stealTurn: false,
 };
 
 export function shuffle<T>(items: readonly T[]): T[] {
@@ -65,22 +67,35 @@ export function wordIndexFor(score: number): number {
   return score % WORDS_PER_CARD;
 }
 
-/**
- * Points the explaining team earns in a turn: +1 per correct word, optionally -1 per skip.
- * The last word counts only if the explaining team guessed it, and is never penalised.
- */
-export function turnPoints(turnWords: TurnWord[], settings: Settings, teamId: string): number {
-  return turnWords.reduce((sum, w) => {
-    if (w.isLastWord) return w.guessedBy === teamId ? sum + 1 : sum;
-    if (w.result === 'correct') return sum + 1;
-    return settings.skipPenalty ? sum - 1 : sum;
-  }, 0);
+/** The team that won a word: whoever guessed it (last word, steal turn), else the explaining team if correct. */
+function winnerOf(w: TurnWord, activeId: string): string | null {
+  if (w.guessedBy !== undefined) return w.guessedBy;
+  return w.result === 'correct' ? activeId : null;
 }
 
-/** The other team that stole the last word (and its +1), if any. */
-export function lastWordThief(turnWords: TurnWord[], teamId: string): string | null {
-  const last = turnWords.find((w) => w.isLastWord);
-  return last?.guessedBy && last.guessedBy !== teamId ? last.guessedBy : null;
+/**
+ * Steps each team earns in a turn: +1 per word it guessed. The explaining team
+ * optionally loses a step per skipped word (never for the last word).
+ */
+export function turnAwards(turnWords: TurnWord[], settings: Settings, activeId: string): Record<string, number> {
+  const awards: Record<string, number> = { [activeId]: 0 };
+  for (const w of turnWords) {
+    const winner = winnerOf(w, activeId);
+    if (winner) awards[winner] = (awards[winner] ?? 0) + 1;
+    else if (!w.isLastWord && settings.skipPenalty) awards[activeId] -= 1;
+  }
+  return awards;
+}
+
+/** Steps the explaining team earns in a turn. */
+export function turnPoints(turnWords: TurnWord[], settings: Settings, teamId: string): number {
+  return turnAwards(turnWords, settings, teamId)[teamId] ?? 0;
+}
+
+/** Guess order used when fixing who guessed a word: explaining team, the others, nobody. */
+function guessOrder(state: GameState): (string | null)[] {
+  const activeId = state.teams[state.currentTeamIndex].id;
+  return [activeId, ...state.teams.filter((t) => t.id !== activeId).map((t) => t.id), null];
 }
 
 export function currentTeam(state: GameState): Team | undefined {
@@ -109,24 +124,31 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'BEGIN_TURN': {
       if (state.phase !== 'scoreboard') return state;
-      const wordIndex = wordIndexFor(state.teams[state.currentTeamIndex].score);
-      const next = { ...state, wordIndex };
+      const active = state.teams[state.currentTeamIndex];
+      const wordIndex = wordIndexFor(active.score);
+      // A pending steal turn is used up now.
+      const teams = state.teams.map((t) => (t.id === active.id ? { ...t, stealNext: false } : t));
+      const next = { ...state, teams, wordIndex, stealTurn: !!active.stealNext };
       return { ...next, ...drawCard(next, []), phase: 'turn', turnWords: [] };
     }
 
     case 'ANSWER': {
       if (state.phase !== 'turn' || state.currentWord === null) return state;
-      const turnWords = [...state.turnWords, { word: state.currentWord, result: action.result }];
+      const word: TurnWord = { word: state.currentWord, result: action.result };
+      if (state.stealTurn) {
+        // Steal turn: record which team guessed it first (or nobody, on a skip).
+        word.guessedBy = action.result === 'correct' ? (action.teamId ?? state.teams[state.currentTeamIndex].id) : null;
+      }
+      const turnWords = [...state.turnWords, word];
       return { ...state, ...drawCard(state, turnWords), turnWords };
     }
 
     case 'LAST_WORD': {
       // Time ran out: whoever guesses the word on screen gets the point.
       if (state.phase !== 'turn' || state.currentWord === null) return state;
-      const activeId = state.teams[state.currentTeamIndex].id;
       const lastWord: TurnWord = {
         word: state.currentWord,
-        result: action.teamId === activeId ? 'correct' : 'skipped',
+        result: action.teamId ? 'correct' : 'skipped',
         isLastWord: true,
         guessedBy: action.teamId,
       };
@@ -148,26 +170,22 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'TOGGLE_WORD': {
       if (state.phase !== 'summary') return state;
       const turnWords = state.turnWords.map((w, i) =>
-        i === action.index && !w.isLastWord
+        i === action.index && w.guessedBy === undefined
           ? { ...w, result: w.result === 'correct' ? ('skipped' as const) : ('correct' as const) }
           : w,
       );
       return { ...state, turnWords };
     }
 
-    case 'CYCLE_LAST_WORD': {
-      // Summary fix-up for the last word: explaining team → other teams → nobody → …
+    case 'CYCLE_LAST_WORD':
+    case 'CYCLE_WORD': {
       if (state.phase !== 'summary') return state;
-      const activeId = state.teams[state.currentTeamIndex].id;
-      const order: (string | null)[] = [
-        activeId,
-        ...state.teams.filter((t) => t.id !== activeId).map((t) => t.id),
-        null,
-      ];
-      const turnWords = state.turnWords.map((w) => {
-        if (!w.isLastWord) return w;
-        const next = order[(order.indexOf(w.guessedBy ?? null) + 1) % order.length];
-        return { ...w, guessedBy: next, result: next === activeId ? ('correct' as const) : ('skipped' as const) };
+      const index = action.type === 'CYCLE_WORD' ? action.index : state.turnWords.findIndex((w) => w.isLastWord);
+      const order = guessOrder(state);
+      const turnWords = state.turnWords.map((w, i) => {
+        if (i !== index || w.guessedBy === undefined) return w;
+        const next = order[(order.indexOf(w.guessedBy) + 1) % order.length];
+        return { ...w, guessedBy: next, result: next ? ('correct' as const) : ('skipped' as const) };
       });
       return { ...state, turnWords };
     }
@@ -175,19 +193,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CONFIRM_TURN': {
       if (state.phase !== 'summary') return state;
       const activeId = state.teams[state.currentTeamIndex].id;
-      const points = turnPoints(state.turnWords, state.settings, activeId);
-      const thiefId = lastWordThief(state.turnWords, activeId);
+      const target = state.settings.targetScore;
+      const awards = turnAwards(state.turnWords, state.settings, activeId);
       const previousScores = Object.fromEntries(state.teams.map((t) => [t.id, t.score]));
-      const clamp = (n: number) => Math.min(state.settings.targetScore, Math.max(0, n));
+      const clamp = (n: number) => Math.min(target, Math.max(0, n));
       const teams = state.teams.map((t) => {
-        if (t.id === activeId) return { ...t, score: clamp(t.score + points) };
-        if (t.id === thiefId) return { ...t, score: clamp(t.score + 1) };
-        return t;
+        if (!awards[t.id]) return t;
+        const score = clamp(t.score + awards[t.id]);
+        // Landing on or passing a steal square makes the team's next turn a steal turn.
+        return { ...t, score, stealNext: t.stealNext || crossesStealSquare(t.score, score, target) };
       });
       // The explaining team is checked first, so it wins a tie on the finish square.
-      const winner = [activeId, thiefId]
+      const winner = [activeId, ...teams.map((t) => t.id).filter((id) => id !== activeId)]
         .map((id) => teams.find((t) => t.id === id))
-        .find((t) => t && t.score >= state.settings.targetScore);
+        .find((t) => t && t.score >= target);
       if (winner) {
         return { ...state, teams, previousScores, phase: 'winner', winnerId: winner.id, turnWords: [] };
       }
@@ -208,7 +227,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...initialState,
         phase: 'scoreboard',
         settings: state.settings,
-        teams: state.teams.map((t) => ({ ...t, score: 0 })),
+        teams: state.teams.map((t) => ({ ...t, score: 0, stealNext: false })),
         deck: dealCards(),
       };
 

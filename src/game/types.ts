@@ -8,6 +8,8 @@ export interface Team {
   color: string;
   /** Board position = accumulated points. */
   score: number;
+  /** Landed on / passed a steal square: the team's next turn is a steal turn. */
+  stealNext?: boolean;
 }
 
 export interface TurnWord {
@@ -15,7 +17,10 @@ export interface TurnWord {
   result: WordResult;
   /** The word on screen when time ran out; any team may guess it. */
   isLastWord?: boolean;
-  /** Last word only: the team that guessed it, or null if nobody did. */
+  /**
+   * For words any team may guess (the last word, every word of a steal turn):
+   * the team that guessed it, or null if nobody did. Undefined for ordinary words.
+   */
   guessedBy?: string | null;
 }
 
@@ -45,6 +50,8 @@ export interface GameState {
   currentWord: string | null;
   turnWords: TurnWord[];
   winnerId: string | null;
+  /** This turn is a steal turn: all teams guess at the same time. */
+  stealTurn: boolean;
   /** Scores before the last confirmed turn, so the board can animate the pawns' moves. */
   previousScores: Record<string, number>;
 }
@@ -52,9 +59,12 @@ export interface GameState {
 export type GameAction =
   | { type: 'START_GAME'; teamNames: string[]; settings: Settings }
   | { type: 'BEGIN_TURN' }
-  | { type: 'ANSWER'; result: WordResult }
+  /** In a steal turn, `teamId` is the team that guessed the word (defaults to the explaining team). */
+  | { type: 'ANSWER'; result: WordResult; teamId?: string }
   | { type: 'LAST_WORD'; teamId: string | null }
   | { type: 'CYCLE_LAST_WORD' }
+  /** Summary fix-up for a word any team may guess: explaining team → other teams → nobody → … */
+  | { type: 'CYCLE_WORD'; index: number }
   | { type: 'END_TURN' }
   | { type: 'TOGGLE_WORD'; index: number }
   | { type: 'CONFIRM_TURN' }

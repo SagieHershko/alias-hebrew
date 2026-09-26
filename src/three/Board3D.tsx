@@ -4,6 +4,7 @@ import { Suspense, useMemo, useRef, type RefObject } from 'react';
 import { PanResponder, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import * as THREE from 'three';
 
+import { isStealSquare } from '../game/board';
 import type { Team } from '../game/types';
 import { computeLayout, type BoardLayout } from './boardLayout';
 import { LivingRoom } from './LivingRoom';
@@ -351,12 +352,14 @@ function BoardBase({ layout, logo }: { layout: BoardLayout; logo: THREE.Texture 
 
 /**
  * Texture-atlas cell of a square. Like the printed board, squares are numbered
- * 1–8 over and over; the start is a big glowing 1 and the finish is the ✌ disc.
+ * 1–8 over and over; steal squares are red with a white ring, the start is a big
+ * glowing 1 and the finish is the ✌ disc.
  */
 function atlasCell(index: number, target: number) {
   if (index === target) return 0;
   if (index === 0) return 63;
-  return (index % 8) + 1;
+  const label = (index % 8) + 1;
+  return isStealSquare(index, target) ? 8 + label : label;
 }
 
 function atlasPlane(cell: number, radius: number) {
@@ -389,7 +392,8 @@ function Discs({ layout, texture, view }: { layout: BoardLayout; texture: THREE.
         const next = layout.squares[Math.min(target, i + 1)];
         const prev = layout.squares[Math.max(0, i - 1)];
         const angle = Math.atan2(next.x - prev.x, next.z - prev.z) + Math.PI * 0.75;
-        return { ...sq, radius, angle, face: atlasPlane(atlasCell(i, target), radius * 0.98) };
+        const color = isStealSquare(i, target) ? RED : '#ffffff';
+        return { ...sq, radius, angle, color, face: atlasPlane(atlasCell(i, target), radius * 0.98) };
       }),
     [layout, target],
   );
@@ -405,7 +409,7 @@ function Discs({ layout, texture, view }: { layout: BoardLayout; texture: THREE.
           )}
           <mesh position-y={DISC_HEIGHT / 2} castShadow receiveShadow>
             <cylinderGeometry args={[d.radius, d.radius, DISC_HEIGHT, 40]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.4} />
+            <meshStandardMaterial color={d.color} roughness={0.4} />
           </mesh>
           <mesh
             position={[Math.sin(d.angle) * d.radius * 0.85, DISC_HEIGHT / 2, Math.cos(d.angle) * d.radius * 0.85]}
@@ -413,7 +417,7 @@ function Discs({ layout, texture, view }: { layout: BoardLayout; texture: THREE.
             castShadow
           >
             <boxGeometry args={[d.radius * 0.5, DISC_HEIGHT, d.radius * 0.5]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.4} />
+            <meshStandardMaterial color={d.color} roughness={0.4} />
           </mesh>
           <mesh
             ref={(m) => {

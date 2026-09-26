@@ -19,14 +19,17 @@ const peace = (color, size) => `
 
 // 8×8 atlas of disc faces, 128 px per cell.
 // cell 0 = finish (✌), cells 1..8 = the board's repeating 1–8 numbers,
-// cell 63 = the glowing start square (a big "1", like the printed board).
+// cells 9..16 = steal squares 1..8 (red with a white ring, like the printed board),
+// cell 63 = the glowing start square (a big "1").
 function atlasHtml() {
   const cells = [];
   for (let i = 0; i < 64; i++) {
     let inner;
     if (i === 0) inner = `<div class="disc finish">${peace(RED, 88)}</div>`;
     else if (i === 63) inner = `<div class="disc start">1</div>`;
-    else inner = `<div class="disc">${i}</div>`;
+    else if (i <= 8) inner = `<div class="disc">${i}</div>`;
+    else if (i <= 16) inner = `<div class="disc steal">${i - 8}</div>`;
+    else inner = '';
     cells.push(`<div class="cell">${inner}</div>`);
   }
   return `<html><head><meta charset="utf-8"><style>
@@ -37,6 +40,7 @@ function atlasHtml() {
       font:900 76px ${FONT};-webkit-text-stroke:4px ${RED};display:flex;align-items:center;justify-content:center;
       box-shadow:inset 0 -6px 0 rgba(0,0,0,.08)}
     .finish{background:#fff;border:8px solid ${RED};box-sizing:border-box;box-shadow:inset 0 0 0 5px #fff, inset 0 0 0 9px ${RED}}
+    .steal{background:${RED};color:#fff;-webkit-text-stroke:4px #fff;box-shadow:inset 0 0 0 6px ${RED}, inset 0 0 0 12px #fff}
     .start{font-size:84px;background:radial-gradient(circle,#fff 62%,#FFD9A0 100%)}
   </style></head><body><div id="atlas">${cells.join('')}</div></body></html>`;
 }

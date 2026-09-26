@@ -1,9 +1,10 @@
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
 import { currentTeam, wordIndexFor } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
+import { colors } from '../../theme';
 import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
@@ -80,9 +81,27 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
           <Text style={panel.hint}>
             הפיון על משבצת {wordNo}, לכן מסבירים את מילה {wordNo} בכל קלף · גררו לסיבוב הלוח, צבטו לזום
           </Text>
+          {next.stealNext && (
+            <Text style={styles.steal}>⚡ תור גניבה! כל הקבוצות מנחשות בו זמנית – מי שמנחש ראשון מקבל את הצעד</Text>
+          )}
         </View>
         <BigButton label="התחלת תור ⏳" variant="primary" large onPress={() => dispatch({ type: 'BEGIN_TURN' })} />
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  steal: {
+    marginTop: 4,
+    color: colors.ink,
+    backgroundColor: colors.gold,
+    fontWeight: '900',
+    fontSize: 14,
+    textAlign: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+});
