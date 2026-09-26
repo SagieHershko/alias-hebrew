@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BigButton } from '../../components/BigButton';
 import { currentTeam, turnAwards } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
-import { colors, radius, readableOn } from '../../theme';
+import { colors, radius, readableOn, RLM } from '../../theme';
 import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
@@ -27,11 +27,13 @@ export function SummaryPanel() {
       <View style={[panel.bottom, styles.sheet, { paddingBottom: insets.bottom + 14 }]} onLayout={stage.onBottomLayout}>
         <Text style={styles.title}>{state.stealTurn ? 'נגמר תור הגניבה!' : 'נגמר הזמן!'}</Text>
         <Text style={styles.subtitle}>
+          {RLM}
           {team.name}: {points >= 0 ? `+${points}` : points} צעדים
         </Text>
         <Text style={styles.help}>עוברים למשבצת {newScore}</Text>
         {thieves.map((t) => (
           <Text key={t.id} style={styles.steal}>
+            {RLM}
             {t.name} גנבו {awards[t.id] === 1 ? 'צעד אחד' : `${awards[t.id]} צעדים`}
           </Text>
         ))}
@@ -97,9 +99,9 @@ export function SummaryPanel() {
 
 const styles = StyleSheet.create({
   sheet: { maxHeight: '72%', gap: 6 },
-  title: { fontSize: 32, fontWeight: '900', color: colors.white, textAlign: 'center' },
-  subtitle: { fontSize: 20, fontWeight: '800', color: colors.white, textAlign: 'center' },
-  help: { fontSize: 14, color: colors.offWhite, textAlign: 'center', marginBottom: 4 },
+  title: { flexShrink: 0, fontSize: 32, fontWeight: '900', color: colors.white, textAlign: 'center' },
+  subtitle: { flexShrink: 0, fontSize: 20, fontWeight: '800', color: colors.white, textAlign: 'center' },
+  help: { flexShrink: 0, fontSize: 14, color: colors.offWhite, textAlign: 'center', marginBottom: 4 },
   list: { flexShrink: 1, backgroundColor: colors.white, borderRadius: radius.lg },
   listContent: { padding: 8 },
   row: {
@@ -116,6 +118,7 @@ const styles = StyleSheet.create({
   lastRow: { backgroundColor: '#FFF8E1', borderRadius: radius.sm },
   lastLabel: { fontSize: 12, fontWeight: '800', color: colors.muted },
   steal: {
+    flexShrink: 0,
     alignSelf: 'center',
     backgroundColor: colors.gold,
     color: colors.ink,

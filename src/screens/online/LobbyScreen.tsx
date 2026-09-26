@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { BigButton } from '../../components/BigButton';
 import { Chips, SECONDS_OPTIONS, TARGET_OPTIONS } from '../../components/Chips';
+import { InviteQR } from '../../components/InviteQR';
 import { MAX_TEAMS, MIN_TEAMS } from '../../game/gameReducer';
 import {
   canStart,
@@ -29,6 +30,7 @@ export function LobbyScreen({ room, user, onLeave }: { room: Room; user: User; o
   const unassigned = Object.entries(room.players).filter(([, p]) => p.teamIndex === null);
   const url = inviteUrl(room.code);
   const [copied, setCopied] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const host = room.players[room.hostUid];
 
   const copy = () => {
@@ -64,6 +66,17 @@ export function LobbyScreen({ room, user, onLeave }: { room: Room; user: User; o
             style={styles.flex}
           />
         </View>
+        <BigButton
+          label={showQR ? 'הסתרת קוד QR' : '📷 קוד QR למי שלידך'}
+          variant="light"
+          onPress={() => setShowQR((v) => !v)}
+        />
+        {showQR && (
+          <>
+            <InviteQR url={url} size={200} />
+            <Text style={styles.qrHint}>סרקו במצלמה של הטלפון כדי להצטרף</Text>
+          </>
+        )}
       </View>
 
       {/* Teams */}
@@ -230,6 +243,7 @@ const styles = StyleSheet.create({
   cardMine: { borderColor: colors.gold },
   cardTitle: { fontSize: 20, fontWeight: '900', color: colors.red },
   label: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  qrHint: { fontSize: 14, color: colors.muted, textAlign: 'center' },
   code: {
     fontSize: 44,
     fontWeight: '900',

@@ -25,6 +25,12 @@ export const TEAM_COLORS = [
   '#FF7A00', // כתום
 ] as const;
 
+/**
+ * Right-to-left mark. Put it before text that starts with a name, so a Latin name
+ * (e.g. a Google account name) doesn't flip the Hebrew line to left-to-right.
+ */
+export const RLM = '‏';
+
 export const TEAM_COLOR_NAMES = ['צהוב', 'כחול', 'ירוק', 'שחור', 'סגול', 'כתום'] as const;
 
 /** Dark text on light pawn colours (yellow), white text on the rest. */

@@ -9,7 +9,7 @@ export const MAX_TEAMS = 6;
 export const DEFAULT_SETTINGS: Settings = {
   targetScore: 30,
   turnSeconds: 60,
-  skipPenalty: false,
+  skipPenalty: true,
 };
 
 export const initialState: GameState = {

@@ -122,6 +122,7 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
 const styles = StyleSheet.create({
   waiting: { alignSelf: 'center', color: colors.white, fontWeight: '800', fontSize: 17, textAlign: 'center' },
   steal: {
+    flexShrink: 0,
     marginTop: 4,
     color: colors.ink,
     backgroundColor: colors.gold,

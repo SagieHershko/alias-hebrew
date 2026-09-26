@@ -12,7 +12,7 @@ import { useGame } from '../../game/GameContext';
 import type { WordResult } from '../../game/types';
 import { useTurnClock } from '../../hooks/useTurnClock';
 import { serverNow } from '../../online/serverTime';
-import { colors, radius, readableOn, shadow } from '../../theme';
+import { colors, radius, readableOn, RLM, shadow } from '../../theme';
 import { playSound } from '../../sound/sounds';
 import type { SandState } from '../../three/Board3D';
 import { panel } from './panel';
@@ -122,9 +122,9 @@ export function TurnPanel({ sand, onCardShown }: Props) {
         detail: `תור גניבה – ${online?.explainer?.name} מסביר/ה, מי שמנחש ראשון מקבל את הצעד`,
       }
     : myTeamActive
-      ? { headline: 'נחשו!', detail: `${online?.explainer?.name} מסביר/ה לקבוצה שלכם` }
-      : { headline: `${team.name} מנחשים`, detail: `${online?.explainer?.name} מסביר/ה · חכו לתור שלכם` };
-  const title = `${team.name} מסבירים · מילה ${state.wordIndex + 1}${state.stealTurn ? ' · תור גניבה' : ''}`;
+      ? { headline: 'נחשו!', detail: `${RLM}${online?.explainer?.name} מסביר/ה לקבוצה שלכם` }
+      : { headline: `${RLM}${team.name} מנחשים`, detail: `${RLM}${online?.explainer?.name} מסביר/ה · חכו לתור שלכם` };
+  const title = `${RLM}${team.name} מסבירים · מילה ${state.wordIndex + 1}${state.stealTurn ? ' · תור גניבה' : ''}`;
 
   // Ignore an accidental double tap (one card per tap).
   const lastTap = useRef(0);
@@ -239,11 +239,11 @@ export function TurnPanel({ sand, onCardShown }: Props) {
                 ? `מילה אחרונה – ${online?.explainer?.name} יסמן/תסמן מי ניחש`
                 : timer.paused
                   ? 'המשחק מושהה'
-                  : `${online?.explainer?.name} מסמן/ת את התשובות`}
+                  : `${RLM}${online?.explainer?.name} מסמן/ת את התשובות`}
             </Text>
           ) : lastWord ? (
             <>
-              <Text style={styles.lastTitle}>החול נגמר! מילה אחרונה – מי ניחש?</Text>
+              <Text style={styles.lastTitle}>נגמר הזמן! מילה אחרונה – איזו קבוצה ניחשה?</Text>
               {teamButtons(awardLastWord)}
               <BigButton label="אף אחד לא ניחש" variant="skip" onPress={() => awardLastWord(null)} />
             </>

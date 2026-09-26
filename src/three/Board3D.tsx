@@ -193,7 +193,7 @@ function Scene({
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;
   }
-  const props = useMemo(() => propPositions(layout), [layout]);
+  const props = useMemo(() => propPositions(layout, teams.length), [layout, teams.length]);
 
   return (
     <>
@@ -569,16 +569,23 @@ const TOP_SAND = [
   [0, 0.4],
 ].map(([x, y]) => new THREE.Vector2(x, y));
 
-function propPositions(layout: BoardLayout) {
+/** Deck spots behind the board (two rows of three), in the order they are filled. */
+const DECK_SPOTS: [number, number, number][] = [
+  [-0.1, 0.7, 0.05],
+  [-0.05, -0.45, 0.18],
+  [1.05, 0.6, 0.22],
+  [1.1, -0.5, -0.1],
+  [-1.25, 0.65, -0.12],
+  [-1.2, -0.4, 0.1],
+];
+
+/** One card deck per team, and the sand timer. */
+function propPositions(layout: BoardLayout, deckCount: number) {
   const baseX = layout.width / 2 - 1.7;
   const baseZ = -layout.depth / 2 - 1.35;
-  const decks: [number, number, number][] = [
-    [baseX - 0.55, baseZ - 0.35, 0.18],
-    [baseX + 0.6, baseZ - 0.55, -0.1],
-    [baseX - 0.35, baseZ + 0.75, 0.05],
-    [baseX + 0.85, baseZ + 0.55, 0.22],
-  ];
-  const [x, z] = decks[2];
+  const count = Math.min(DECK_SPOTS.length, Math.max(1, deckCount));
+  const decks = DECK_SPOTS.slice(0, count).map(([dx, dz, r]): [number, number, number] => [baseX + dx, baseZ + dz, r]);
+  const [x, z] = decks[0];
   return {
     decks,
     drawFrom: new THREE.Vector3(x, 0.42, z),
