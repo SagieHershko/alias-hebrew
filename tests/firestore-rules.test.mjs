@@ -1,6 +1,6 @@
 // Security-rules tests against the Firestore emulator: `npm run emulators` in one terminal, then `npm run test:rules`.
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp, deleteField, Timestamp } from 'firebase/firestore';
 import fs from 'node:fs';
 
 const env = await initializeTestEnvironment({
@@ -11,8 +11,9 @@ await env.clearFirestore();
 const db = (uid) => (uid ? env.authenticatedContext(uid).firestore() : env.unauthenticatedContext().firestore());
 const player = (name, teamIndex = 0) => ({ name, photo: null, teamIndex, joinedAt: Date.now() });
 const settings = { targetScore: 30, turnSeconds: 60, skipPenalty: false };
+const expiry = (days = 2) => Timestamp.fromMillis(Date.now() + days * 86400000);
 const room = (over = {}) => ({
-  code: 'ABCDE', hostUid: 'host', status: 'lobby', createdAt: Date.now(), updatedAt: serverTimestamp(),
+  code: 'ABCDE', hostUid: 'host', status: 'lobby', createdAt: Date.now(), updatedAt: serverTimestamp(), expiresAt: expiry(),
   players: { host: player('Host') }, teamNames: ['א', 'ב'], settings, game: null, rev: 0, ...over,
 });
 const ref = (d) => doc(d, 'rooms', 'ABCDE');
@@ -26,6 +27,8 @@ await t('cannot create a room for someone else', assertFails(setDoc(ref(db('eve'
 await t('cannot create with extra players', assertFails(setDoc(ref(db('host')), room({ players: { host: player('Host'), bob: player('Bob') } }))));
 await t('cannot create a room with a game already in it', assertFails(setDoc(ref(db('host')), room({ game: '{}' }))));
 await t('code must match the document id', assertFails(setDoc(ref(db('host')), room({ code: 'ZZZZZ' }))));
+await t('cannot create without an expiry', assertFails(setDoc(ref(db('host')), (({ expiresAt, ...r }) => r)(room()))));
+await t('cannot create a room that never expires', assertFails(setDoc(ref(db('host')), room({ expiresAt: expiry(365) }))));
 await t('host creates a valid room', assertSucceeds(setDoc(ref(db('host')), room())));
 
 console.log('Reading');
@@ -48,6 +51,7 @@ await t('non-host cannot change settings', assertFails(updateDoc(ref(db('bob')),
 await t('host changes settings', assertSucceeds(updateDoc(ref(db('host')), { settings: { ...settings, targetScore: 50 }, updatedAt: serverTimestamp() })));
 await wait(150);
 await t('invalid settings are rejected', assertFails(updateDoc(ref(db('host')), { settings: { ...settings, turnSeconds: 5000 }, updatedAt: serverTimestamp() })));
+await t('host cannot extend the expiry', assertFails(updateDoc(ref(db('host')), { expiresAt: expiry(3), updatedAt: serverTimestamp() })));
 await t('host cannot hand the room to someone else', assertFails(updateDoc(ref(db('host')), { hostUid: 'bob', updatedAt: serverTimestamp() })));
 await t('7 teams are rejected', assertFails(updateDoc(ref(db('host')), { teamNames: ['1','2','3','4','5','6','7'], updatedAt: serverTimestamp() })));
 await t('write without the server time stamp is rejected', assertFails(updateDoc(ref(db('host')), { teamNames: ['א', 'ב', 'ג'] })));

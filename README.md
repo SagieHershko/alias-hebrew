@@ -81,14 +81,24 @@ These are public client settings, not secrets. Access is enforced by the securit
   - Google sign-in is required, and rooms can't be listed or scanned; you need the code.
   - Players can only change their own entry, only members can change the game, and only the host can change settings.
   - Every write is validated: field types and sizes, at most 20 players, 2–6 teams, the game under 300 KB.
+  - Clock-sync pings can only be written by members of an existing room.
+- **Old rooms are deleted automatically** 2 days after creation: set up a TTL policy once (below).
 - **Rate limit:** a room accepts at most one game or settings change every 100 ms (enforced by the server rules). The app spaces writes 120 ms apart, ignores double taps, and caps queued actions.
 - **Consistency:** every action runs in a Firestore transaction (read → pure reducer → write), with retries and exponential backoff on contention or network errors. A lost connection shows a notice, and corrupt data never crashes the screen (an error boundary catches the rest).
 - **Tested** against the Firebase emulators:
-  - 36 rules checks: `npm run emulators`, then `npm run test:rules`.
+  - Rules checks: `npm run emulators`, then `npm run test:rules`.
   - A load test: 12 players joined one room simultaneously (all succeeded), 6 players sent 90 rapid actions at once (no errors, final state consistent).
   - A 4-browser end-to-end game.
 - **Cost:** the free Spark plan (50k reads / 20k writes a day) covers roughly 15 full 8-player games a day. Every answer is 1 write plus 1 read per player. For more, switch to Blaze (pay as you go, cents) and set a budget alert.
-- **Recommended for a public launch:** enable [App Check](https://firebase.google.com/docs/app-check) (reCAPTCHA) so only your site can use the project.
+
+### Hardening (recommended for a public launch)
+
+1. **TTL (auto-delete old rooms):** Google Cloud console → Firestore → **Time-to-live** → **Create policy**: collection group `rooms`, timestamp field `expiresAt`. Repeat for collection group `clock`, field `expiresAt`.
+2. **[App Check](https://firebase.google.com/docs/app-check)** — only your site can use the project, so scripts can't guess room codes or burn the daily quota:
+   - Firebase console → **App Check** → **Apps** → your web app → **reCAPTCHA Enterprise** → create a key for your Vercel domain → **Save**.
+   - Vercel: add `EXPO_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` = that site key, then redeploy.
+   - After a day, check the App Check metrics show your traffic as verified, then **Enforce** for Cloud Firestore and Authentication.
+3. **Restrict the API key:** Google Cloud console → APIs & Services → **Credentials** → the "Browser key" → **Website restrictions**: `https://<your-app>.vercel.app/*` and `https://<project-id>.firebaseapp.com/*`.
 
 ## The 3D table
 

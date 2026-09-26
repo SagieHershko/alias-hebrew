@@ -10,6 +10,8 @@ rules_version = '2';
 // - Only room members may change the game; only the host may change the room settings.
 // - Every write is validated (field types and sizes, at most 20 players, 2–6 teams).
 // - Rate limit: a room accepts at most one game / settings change every 100 ms.
+// - Rooms expire: expiresAt (set once, at creation) drives a Firestore TTL policy that
+//   deletes old rooms and clock pings automatically.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -37,7 +39,7 @@ service cloud.firestore {
       }
       function validRoom(d) {
         return d.keys().hasOnly(['code', 'hostUid', 'status', 'createdAt', 'updatedAt', 'players',
-                                 'teamNames', 'settings', 'game', 'rev'])
+                                 'teamNames', 'settings', 'game', 'rev', 'expiresAt'])
           && d.code == code
           && d.status in ['lobby', 'playing']
           && d.players is map && d.players.size() <= 20
@@ -67,23 +69,31 @@ service cloud.firestore {
         && after().players.size() == 1
         && after().status == 'lobby' && after().game == null && after().rev == 0
         && stamped()
+        && after().expiresAt is timestamp
+        && after().expiresAt > request.time && after().expiresAt <= request.time + duration.value(3, 'd')
         && validRoom(after());
 
       allow update: if validRoom(after()) && (
         onlyMyPlayerEntry()
         || (isMember() && changed().hasOnly(['game', 'rev', 'updatedAt'])
             && after().rev == before().rev + 1 && stamped() && notTooFast())
-        || (isHost() && !changed().hasAny(['hostUid', 'code', 'createdAt'])
+        || (isHost() && !changed().hasAny(['hostUid', 'code', 'createdAt', 'expiresAt'])
             && stamped() && notTooFast())
       );
 
       allow delete: if isHost();
 
-      // Clock-sync pings: each player writes only their own, a single server timestamp.
+      // Clock-sync pings: each member of the room writes only their own, a server timestamp
+      // (plus an expiry for the TTL policy).
       match /clock/{player} {
+        function roomPath() { return /databases/$(database)/documents/rooms/$(code); }
+        function isRoomMember() { return exists(roomPath()) && player in get(roomPath()).data.players; }
         allow read: if request.auth != null && request.auth.uid == player;
-        allow write: if request.auth != null && request.auth.uid == player
-          && request.resource.data.keys().hasOnly(['t']) && request.resource.data.t == request.time;
+        allow write: if request.auth != null && request.auth.uid == player && isRoomMember()
+          && request.resource.data.keys().hasOnly(['t', 'expiresAt'])
+          && request.resource.data.t == request.time
+          && request.resource.data.expiresAt is timestamp
+          && request.resource.data.expiresAt <= request.time + duration.value(3, 'd');
       }
     }
   }

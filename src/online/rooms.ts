@@ -7,6 +7,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
 } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
@@ -38,6 +39,8 @@ export interface Room {
   rev: number;
   /** Server time of the last game / settings change (the rules rate-limit on it). */
   updatedAt?: unknown;
+  /** When Firestore's TTL policy deletes the room (set once, at creation). */
+  expiresAt?: Timestamp;
 }
 
 /** At most this many players per room (the rules allow up to 20). */
@@ -52,6 +55,10 @@ const RETRYABLE = new Set([
   'failed-precondition',
   'permission-denied', // e.g. two changes within 100 ms: the rate-limit rule refuses the second
 ]);
+
+/** Rooms (and their clock pings) are deleted automatically this long after creation. */
+const ROOM_LIFETIME_MS = 2 * 24 * 60 * 60 * 1000;
+const expiry = () => Timestamp.fromMillis(Date.now() + ROOM_LIFETIME_MS);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -117,6 +124,7 @@ export async function createRoom(user: User): Promise<string> {
           game: null,
           rev: 0,
           updatedAt: serverTimestamp(),
+          expiresAt: expiry(),
         };
         tx.set(roomRef(code), room);
         return true;
@@ -306,7 +314,7 @@ export async function syncServerClock(code: string, uid: string) {
   try {
     const ref = doc(firebase().db, 'rooms', code, 'clock', uid);
     const sent = Date.now();
-    await setDoc(ref, { t: serverTimestamp() });
+    await setDoc(ref, { t: serverTimestamp(), expiresAt: expiry() });
     const snap = await getDocFromServer(ref);
     const received = Date.now();
     const server = (snap.data()?.t as { toMillis(): number } | undefined)?.toMillis();
