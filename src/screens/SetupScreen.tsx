@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AliasLogo } from '../components/AliasLogo';
+import { generateStealSquares } from '../game/board';
 import { Board3D } from '../three/Board3D';
 import { BigButton } from '../components/BigButton';
 import { MAX_TEAMS, MIN_TEAMS } from '../game/gameReducer';
@@ -60,14 +61,16 @@ export function SetupScreen() {
     if (names.length <= MIN_TEAMS) return;
     setNames(names.filter((_, i) => i !== index));
   };
-  const rename = (index: number, value: string) =>
-    setNames(names.map((n, i) => (i === index ? value : n)));
+  const rename = (index: number, value: string) => setNames(names.map((n, i) => (i === index ? value : n)));
 
   // Live preview: one pawn per team waiting on the start square.
   const previewTeams: Team[] = useMemo(
     () => names.map((name, i) => ({ id: `preview-${i}`, name, color: TEAM_COLORS[i], score: 0 })),
     [names],
   );
+
+  // A sample of steal squares for the preview; the real game draws its own at random.
+  const previewSteal = useMemo(() => generateStealSquares(target), [target]);
 
   const start = () =>
     dispatch({
@@ -77,27 +80,23 @@ export function SetupScreen() {
     });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         style={styles.flex}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.hero}>
-          <Board3D teams={previewTeams} target={target} style={styles.heroBoard} />
+          <Board3D teams={previewTeams} target={target} stealSquares={previewSteal} style={styles.heroBoard} />
           <View style={styles.logo} pointerEvents="none">
             <AliasLogo size={112} subtitle={'משחק מילים\nלכל המשפחה!'} />
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>הקבוצות ({names.length}/{MAX_TEAMS})</Text>
+          <Text style={styles.cardTitle}>
+            הקבוצות ({names.length}/{MAX_TEAMS})
+          </Text>
           {names.map((name, i) => (
             <View key={i} style={styles.teamRow}>
               <View style={[styles.pawn, { backgroundColor: TEAM_COLORS[i] }]} />
@@ -167,15 +166,7 @@ export function SetupScreen() {
   );
 }
 
-function Chips({
-  options,
-  value,
-  onChange,
-}: {
-  options: number[];
-  value: number;
-  onChange: (v: number) => void;
-}) {
+function Chips({ options, value, onChange }: { options: number[]; value: number; onChange: (v: number) => void }) {
   return (
     <View style={styles.chips}>
       {options.map((o) => {

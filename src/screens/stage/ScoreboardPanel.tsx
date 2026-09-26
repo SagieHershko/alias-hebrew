@@ -2,6 +2,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
+import { MuteButton } from '../../components/MuteButton';
 import { currentTeam, wordIndexFor } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import { colors } from '../../theme';
@@ -48,6 +49,7 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
           >
             <Text style={panel.iconText}>⟲</Text>
           </Pressable>
+          <MuteButton style={panel.iconBtn} />
           <Pressable
             onPress={quit}
             style={panel.iconBtn}

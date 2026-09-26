@@ -4,17 +4,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
+import { MuteButton } from '../../components/MuteButton';
 import { WordCard } from '../../components/WordCard';
 import { currentTeam, turnPoints } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import type { WordResult } from '../../game/types';
 import { useCountdown } from '../../hooks/useCountdown';
 import { colors, radius, readableOn, shadow } from '../../theme';
+import { playSound } from '../../sound/sounds';
 import { TIMER_FLIP_MS, type SandState } from '../../three/Board3D';
 import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
 function buzz(kind: WordResult | 'timeUp') {
+  playSound(kind === 'correct' ? 'correct' : kind === 'skipped' ? 'skip' : 'timeup');
   const p =
     kind === 'correct'
       ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -64,6 +67,7 @@ export function TurnPanel({ sand, onCardShown }: Props) {
     if (!s) return;
     s.turnId += 1;
     s.progress = 0;
+    playSound('flip');
     return () => {
       s.progress = 1;
     };
@@ -71,6 +75,13 @@ export function TurnPanel({ sand, onCardShown }: Props) {
   useEffect(() => {
     if (sand.current && timer.started) sand.current.progress = 1 - timer.remainingMs / (total * 1000);
   }, [sand, timer.remainingMs, timer.started, total]);
+
+  // The clock ticks through the last 10 seconds, until the sand runs out.
+  const secondsLeft = timer.secondsLeft;
+  const ticking = timer.started && !timer.paused && !lastWord && secondsLeft <= 10 && secondsLeft > 0;
+  useEffect(() => {
+    if (ticking) playSound(secondsLeft % 2 === 0 ? 'tick' : 'tock', secondsLeft <= 3 ? 1 : 0.7);
+  }, [ticking, secondsLeft]);
 
   // Every new card (once the clock runs) flies up from the 3D deck.
   useEffect(() => {
@@ -148,6 +159,7 @@ export function TurnPanel({ sand, onCardShown }: Props) {
             >
               <Text style={styles.statText}>{timer.paused ? '▶' : '❚❚'}</Text>
             </Pressable>
+            <MuteButton style={styles.stat} />
           </View>
           <View style={styles.cardArea} pointerEvents="none">
             {!timer.started && (

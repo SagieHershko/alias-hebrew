@@ -4,8 +4,8 @@ import { Suspense, useMemo, useRef, type RefObject } from 'react';
 import { PanResponder, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import * as THREE from 'three';
 
-import { isStealSquare } from '../game/board';
 import type { Team } from '../game/types';
+import { playSound } from '../sound/sounds';
 import { computeLayout, type BoardLayout } from './boardLayout';
 import { LivingRoom } from './LivingRoom';
 
@@ -94,6 +94,8 @@ interface Props {
   interactive?: boolean;
   view?: RefObject<OrbitView>;
   sand?: RefObject<SandState>;
+  /** Squares drawn as steal squares. */
+  stealSquares?: readonly number[];
   /** Bumped every time a card is drawn: a card flies up from the deck. */
   cardsDrawn?: number;
   style?: StyleProp<ViewStyle>;
@@ -170,7 +172,17 @@ type SceneProps = Omit<Props, 'style' | 'interactive' | 'view' | 'sand'> & {
   sand: RefObject<SandState>;
 };
 
-function Scene({ teams, target, activeTeamId, fromScores, winnerId, view, sand, cardsDrawn = 0 }: SceneProps) {
+function Scene({
+  teams,
+  target,
+  activeTeamId,
+  fromScores,
+  winnerId,
+  view,
+  sand,
+  cardsDrawn = 0,
+  stealSquares = [],
+}: SceneProps) {
   const layout = useMemo(() => computeLayout(target), [target]);
   const [discTex, logoTex, cardTex, floorTex] = useLoader(THREE.TextureLoader, [
     src(DISCS),
@@ -208,7 +220,7 @@ function Scene({ teams, target, activeTeamId, fromScores, winnerId, view, sand, 
       />
       <LivingRoom layout={layout} floorTexture={floorTex} />
       <BoardBase layout={layout} logo={logoTex} />
-      <Discs layout={layout} texture={discTex} view={view} />
+      <Discs layout={layout} texture={discTex} view={view} stealSquares={stealSquares} />
       <Decks decks={props.decks} cardTexture={cardTex} />
       <SandTimer position={props.timer} sand={sand} />
       <CardFlight from={props.drawFrom} cardsDrawn={cardsDrawn} texture={cardTex} />
@@ -355,11 +367,11 @@ function BoardBase({ layout, logo }: { layout: BoardLayout; logo: THREE.Texture 
  * 1–8 over and over; steal squares are red with a white ring, the start is a big
  * glowing 1 and the finish is the ✌ disc.
  */
-function atlasCell(index: number, target: number) {
+function atlasCell(index: number, target: number, steal: boolean) {
   if (index === target) return 0;
   if (index === 0) return 63;
   const label = (index % 8) + 1;
-  return isStealSquare(index, target) ? 8 + label : label;
+  return steal ? 8 + label : label;
 }
 
 function atlasPlane(cell: number, radius: number) {
@@ -376,7 +388,17 @@ function atlasPlane(cell: number, radius: number) {
 }
 
 /** The numbers turn with the camera so they always read upright. */
-function Discs({ layout, texture, view }: { layout: BoardLayout; texture: THREE.Texture; view: RefObject<OrbitView> }) {
+function Discs({
+  layout,
+  texture,
+  view,
+  stealSquares,
+}: {
+  layout: BoardLayout;
+  texture: THREE.Texture;
+  view: RefObject<OrbitView>;
+  stealSquares: readonly number[];
+}) {
   const faces = useRef<(THREE.Mesh | null)[]>([]);
   useFrame(() => {
     const az = view.current?.shownAzimuth ?? 0;
@@ -392,10 +414,11 @@ function Discs({ layout, texture, view }: { layout: BoardLayout; texture: THREE.
         const next = layout.squares[Math.min(target, i + 1)];
         const prev = layout.squares[Math.max(0, i - 1)];
         const angle = Math.atan2(next.x - prev.x, next.z - prev.z) + Math.PI * 0.75;
-        const color = isStealSquare(i, target) ? RED : '#ffffff';
-        return { ...sq, radius, angle, color, face: atlasPlane(atlasCell(i, target), radius * 0.98) };
+        const steal = stealSquares.includes(i);
+        const color = steal ? RED : '#ffffff';
+        return { ...sq, radius, angle, color, face: atlasPlane(atlasCell(i, target, steal), radius * 0.98) };
       }),
-    [layout, target],
+    [layout, target, stealSquares],
   );
   return (
     <>
@@ -482,8 +505,14 @@ function Pawn({ team, teams, layout, from, active, celebrating }: PawnProps) {
     const to = team.score;
     if (t - start.current > HOP_DELAY && progress.current !== to) {
       const step = HOP_SPEED * Math.min(delta, 0.1);
-      progress.current =
-        to > progress.current ? Math.min(to, progress.current + step) : Math.max(to, progress.current - step);
+      const before = progress.current;
+      const up = to > before;
+      progress.current = up ? Math.min(to, before + step) : Math.max(to, before - step);
+      // A wooden "tok" each time the pawn lands on a square.
+      const landed = up
+        ? Math.floor(progress.current) !== Math.floor(before)
+        : Math.ceil(progress.current) !== Math.ceil(before);
+      if (landed) playSound('hop', 0.8);
     }
     const p = Math.max(0, Math.min(last, progress.current));
     const i = Math.floor(p);

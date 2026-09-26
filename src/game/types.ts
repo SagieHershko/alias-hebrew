@@ -50,6 +50,8 @@ export interface GameState {
   currentWord: string | null;
   turnWords: TurnWord[];
   winnerId: string | null;
+  /** This game's steal squares (random per game). */
+  stealSquares: number[];
   /** This turn is a steal turn: all teams guess at the same time. */
   stealTurn: boolean;
   /** Scores before the last confirmed turn, so the board can animate the pawns' moves. */

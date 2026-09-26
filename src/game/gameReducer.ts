@@ -1,6 +1,6 @@
 import { WORDS, WORDS_PER_CARD } from '../data/words';
 import { TEAM_COLORS } from '../theme';
-import { crossesStealSquare } from './board';
+import { crossesStealSquare, generateStealSquares } from './board';
 import type { GameAction, GameState, Settings, Team, TurnWord } from './types';
 
 export const MIN_TEAMS = 2;
@@ -27,6 +27,7 @@ export const initialState: GameState = {
   winnerId: null,
   previousScores: {},
   stealTurn: false,
+  stealSquares: [],
 };
 
 export function shuffle<T>(items: readonly T[]): T[] {
@@ -119,6 +120,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         settings: action.settings,
         teams,
         deck: dealCards(),
+        stealSquares: generateStealSquares(action.settings.targetScore),
       };
     }
 
@@ -201,7 +203,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         if (!awards[t.id]) return t;
         const score = clamp(t.score + awards[t.id]);
         // Landing on or passing a steal square makes the team's next turn a steal turn.
-        return { ...t, score, stealNext: t.stealNext || crossesStealSquare(t.score, score, target) };
+        return { ...t, score, stealNext: t.stealNext || crossesStealSquare(t.score, score, state.stealSquares) };
       });
       // The explaining team is checked first, so it wins a tie on the finish square.
       const winner = [activeId, ...teams.map((t) => t.id).filter((id) => id !== activeId)]
@@ -229,6 +231,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         settings: state.settings,
         teams: state.teams.map((t) => ({ ...t, score: 0, stealNext: false })),
         deck: dealCards(),
+        stealSquares: generateStealSquares(state.settings.targetScore),
       };
 
     case 'BACK_TO_SETUP':

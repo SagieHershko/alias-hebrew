@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { currentTeam } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
+import { initSounds } from '../../sound/sounds';
 import { Board3D, createView, resetView, type OrbitView, type SandState } from '../../three/Board3D';
 import { ScoreboardPanel } from './ScoreboardPanel';
 import { SummaryPanel } from './SummaryPanel';
@@ -21,6 +22,7 @@ export function GameStage() {
   // Card flights are triggered by the turn panel, once the timer has flipped.
   const [cardFlights, setCardFlights] = useState(0);
   const next = currentTeam(state)!;
+  useEffect(initSounds, []);
   const insets = useMemo<StageInsets>(
     () => ({
       // Block bodies: these must return nothing (callers may use them as effect bodies).
@@ -53,6 +55,7 @@ export function GameStage() {
         winnerId={state.winnerId}
         fromScores={state.previousScores}
         cardsDrawn={cardFlights}
+        stealSquares={state.stealSquares}
       />
       <StageInsetsContext.Provider value={insets}>
         {state.phase === 'scoreboard' && <ScoreboardPanel onResetView={() => resetView(view.current)} />}
