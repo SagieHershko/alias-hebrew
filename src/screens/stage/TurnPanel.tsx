@@ -25,7 +25,7 @@ function buzz(kind: WordResult | 'timeUp') {
 }
 
 /** Room for the card between the table and the buttons. */
-const CARD_AREA = 262;
+const CARD_AREA = 362;
 
 interface LeavingCard {
   key: number;
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     alignSelf: 'center',
     width: '100%',
-    maxWidth: 500,
+    maxWidth: 360,
     paddingHorizontal: 8,
     gap: 8,
   },

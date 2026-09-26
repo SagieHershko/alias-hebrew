@@ -78,32 +78,28 @@ export function WordCard({ title, words, highlight, leaving, onGone, covered }: 
           <Text style={styles.coveredText}>המשחק מושהה</Text>
         </View>
       ) : (
-        <>
-          {/* The team's word: big, on the red band. */}
-          <View style={styles.mine}>
-            <View style={styles.numMine}>
-              <Text style={styles.numTextMine}>{highlight + 1}</Text>
-            </View>
-            <Text style={styles.wordMine} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
-              {words[highlight]}
-            </Text>
-          </View>
-          {/* The rest of the card, small, in two columns (numbers in card order). */}
-          <View style={styles.grid}>
-            {words.map((w, i) =>
-              i === highlight ? null : (
-                <View key={i} style={styles.cell}>
-                  <View style={styles.num}>
-                    <Text style={styles.numText}>{i + 1}</Text>
-                  </View>
-                  <Text style={styles.word} numberOfLines={1}>
-                    {w}
-                  </Text>
+        // All 8 words one under another, in order 1–8, like a real Alias card;
+        // the team's word stays in its place but is big and on a red band.
+        <View style={styles.rows}>
+          {words.map((w, i) => {
+            const mine = i === highlight;
+            return (
+              <View key={i} style={[styles.row, mine ? styles.rowMine : styles.rowOther]}>
+                <View style={[styles.num, mine && styles.numMine]}>
+                  <Text style={[styles.numText, mine && styles.numTextMine]}>{i + 1}</Text>
                 </View>
-              ),
-            )}
-          </View>
-        </>
+                <Text
+                  style={[styles.word, mine && styles.wordMine]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}
+                >
+                  {w}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
       )}
       <View style={styles.bars}>
         {['#FFC107', '#1E63D6', '#1FA84F', '#8E24AA', '#FF7A00'].map((c) => (
@@ -116,11 +112,12 @@ export function WordCard({ title, words, highlight, leaving, onGone, covered }: 
 
 const styles = StyleSheet.create({
   card: {
+    // Portrait, like the physical card.
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 270,
     alignSelf: 'center',
     backgroundColor: colors.white,
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 5,
     borderColor: colors.red,
     overflow: 'hidden',
@@ -130,56 +127,39 @@ const styles = StyleSheet.create({
     elevation: 14,
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 3,
     backgroundColor: colors.red,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
   },
   bubble: {
     borderWidth: 2.5,
     borderColor: colors.white,
     borderRadius: radius.pill,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 1,
   },
   bubbleText: { color: colors.white, fontWeight: '900', fontSize: 16 },
-  headerText: { color: colors.white, fontWeight: '800', fontSize: 15, flex: 1 },
-  mine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.red,
-    borderRadius: 14,
-    margin: 8,
-    marginBottom: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  numMine: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  numTextMine: { color: colors.red, fontWeight: '900', fontSize: 20 },
-  wordMine: { flex: 1, fontSize: 36, fontWeight: '900', color: colors.white },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, opacity: 0.55 },
-  cell: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 3, paddingHorizontal: 4 },
+  headerText: { color: colors.white, fontWeight: '800', fontSize: 13 },
+  rows: { paddingVertical: 6, paddingHorizontal: 8, gap: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6, paddingVertical: 3 },
+  rowOther: { opacity: 0.55 },
+  rowMine: { backgroundColor: colors.red, borderRadius: 12, paddingVertical: 7, marginVertical: 3 },
   num: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  numText: { color: colors.white, fontWeight: '900', fontSize: 11 },
-  word: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.ink },
-  covered: { height: 160, alignItems: 'center', justifyContent: 'center' },
+  numMine: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.white },
+  numText: { color: colors.white, fontWeight: '900', fontSize: 12 },
+  numTextMine: { color: colors.red, fontSize: 17 },
+  word: { flex: 1, fontSize: 17, fontWeight: '700', color: colors.ink },
+  wordMine: { fontSize: 28, fontWeight: '900', color: colors.white },
+  covered: { height: 270, alignItems: 'center', justifyContent: 'center' },
   coveredText: { fontSize: 26, fontWeight: '800', color: colors.muted },
   bars: { flexDirection: 'row', gap: 4, alignSelf: 'flex-end', paddingHorizontal: 10, paddingBottom: 8, paddingTop: 2 },
   bar: { width: 9, height: 12, borderRadius: 3 },

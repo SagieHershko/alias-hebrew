@@ -55,7 +55,7 @@ After setup, the whole game is played on one full-screen 3D table (three.js thro
 - **Board:** raised speech-bubble squares numbered **1–8 over and over**, a glowing start and the ✌ finish. The spiral track is sized to the chosen finish square (20–50).
 - **Camera:** drag with a finger or the mouse to orbit around the board; pinch or use the mouse wheel to zoom. The camera always aims at the middle of the table and keeps the whole table in view in the space between the panels, from any angle. ⟲ resets the view.
 - **Sand timer = turn clock:** when a turn starts it flips over, then the sand runs from the top bulb to the bottom for exactly the turn length. The clock starts once the flip finishes.
-- **Cards:** a card lifts off the deck and flies up, then appears at the bottom of the screen with its 8 words. The team's word (by square number) is big on a red band. נכון / דלג send it away and the next card rises.
+- **Cards:** a card lifts off the deck and flies up, then appears at the bottom of the screen as a portrait card listing its 8 words from 1 to 8. The team's word (by square number) stays in its place but is big on a red band. נכון / דלג send it away and the next card rises.
 - **Living room:** the board sits on a coffee table in a 3D living room (wood floor, rug, sofas, pictures, lamps, a curtained window, TV, plant). Walls between the camera and the table disappear, so orbiting never hides the board. Zoom out to see the whole room.
 - **Turn status:** no top bar during a turn. The seconds, ✓ / ↷ counts, points and pause float to the right of the card.
 - **Pawns:** each team's pawn hops square by square after every turn. The next team has a glowing ring, and the winner's pawn dances.
