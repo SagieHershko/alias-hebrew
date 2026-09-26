@@ -49,6 +49,47 @@ Then copy in `App.tsx`, `index.ts`, `app.json`, `vercel.json` and the `src/` and
 
 `public/index.html` is the web page template (`lang="he" dir="rtl"`, red background, Hebrew title).
 
+## Online play (each player on their own phone)
+
+The home screen offers **📱 one device** (pass the phone around) or **🌐 online with friends**:
+
+1. The host signs in with Google and creates a room. They get a 5-letter code and an **invite link** (WhatsApp / copy).
+2. Each friend opens the link on their own phone, signs in with Google and **picks a team**. The lobby shows everyone with their Google photo, in explaining order.
+3. The host sets team names, the finish square and the turn length, then starts.
+4. **The explainer rotates:** each turn, the team's next player explains, like the physical game.
+   - Only the **explainer's phone** shows the card and the נכון / דלג buttons.
+   - Teammates see "נחשו!". Other teams see who is guessing. In a steal turn, "כולם מנחשים!".
+5. Everything is live on every phone: pawns, the sand timer (synchronised to the server's clock), scores and sounds. If the explainer leaves, the host can run the turn.
+
+Online play is web-only for now (Google sign-in in the browser).
+
+### Setting up Firebase (once, free)
+
+1. [console.firebase.google.com](https://console.firebase.google.com) → **Add project**.
+2. **Build → Authentication → Get started → Sign-in method → Google → Enable**.
+3. **Authentication → Settings → Authorized domains → Add domain**: your Vercel domain (e.g. `alias-hebrew-xi.vercel.app`).
+4. **Build → Firestore Database → Create database** (production mode, any region).
+5. **Firestore → Rules**: paste the contents of [`firestore.rules`](firestore.rules) → **Publish**.
+6. **Project settings → Your apps → Web (`</>`)** → register an app → copy the config values.
+7. **Vercel → your project → Settings → Environment Variables**: add the six `EXPO_PUBLIC_FIREBASE_*` values (see [`.env.example`](.env.example)), then **Redeploy**.
+
+These are public client settings, not secrets. Access is enforced by the security rules.
+
+### Security, rate limits and load
+
+- **Rules** ([`firestore.rules`](firestore.rules)):
+  - Google sign-in is required, and rooms can't be listed or scanned; you need the code.
+  - Players can only change their own entry, only members can change the game, and only the host can change settings.
+  - Every write is validated: field types and sizes, at most 20 players, 2–6 teams, the game under 300 KB.
+- **Rate limit:** a room accepts at most one game or settings change every 100 ms (enforced by the server rules). The app spaces writes 120 ms apart, ignores double taps, and caps queued actions.
+- **Consistency:** every action runs in a Firestore transaction (read → pure reducer → write), with retries and exponential backoff on contention or network errors. A lost connection shows a notice, and corrupt data never crashes the screen (an error boundary catches the rest).
+- **Tested** against the Firebase emulators:
+  - 36 rules checks: `npm run emulators`, then `npm run test:rules`.
+  - A load test: 12 players joined one room simultaneously (all succeeded), 6 players sent 90 rapid actions at once (no errors, final state consistent).
+  - A 4-browser end-to-end game.
+- **Cost:** the free Spark plan (50k reads / 20k writes a day) covers roughly 15 full 8-player games a day. Every answer is 1 write plus 1 read per player. For more, switch to Blaze (pay as you go, cents) and set a budget alert.
+- **Recommended for a public launch:** enable [App Check](https://firebase.google.com/docs/app-check) (reCAPTCHA) so only your site can use the project.
+
 ## The 3D table
 
 After setup, the whole game is played on one full-screen 3D table (three.js through `@react-three/fiber`, `expo-gl` on phones). Each phase only swaps the panels over it:
@@ -89,6 +130,7 @@ alias-hebrew/
     │   ├── board.ts            # Random steal squares per game
     │   └── GameContext.tsx     # useReducer + React context
     ├── sound/sounds.ts         # Sound effects (expo-audio) and mute
+    ├── online/                 # Firebase: Google sign-in, rooms, live sync, server clock
     ├── hooks/useCountdown.ts   # Drift-free countdown with pause and start delay
     ├── three/
     │   ├── Board3D.tsx         # 3D table: board, pawns, decks, sand timer, card flight, orbit camera
@@ -99,7 +141,9 @@ alias-hebrew/
     │   ├── BigButton.tsx
     │   └── WordCard.tsx        # Animated 8-word card
     └── screens/
+        ├── HomeScreen.tsx      # One device / online
         ├── SetupScreen.tsx     # Teams (2–6), finish square, turn length, rules, live 3D preview
+        ├── online/             # Sign-in, create / join, lobby, online game (roles)
         └── stage/
             ├── GameStage.tsx   # Full-screen 3D table + the panel for the current phase
             ├── ScoreboardPanel.tsx

@@ -10,7 +10,9 @@ import { useStageInsets } from './stageInsets';
 
 /** End-of-turn review in a sheet over the table: tap a word to fix it before the points are applied. */
 export function SummaryPanel() {
-  const { state, dispatch } = useGame();
+  const { state, dispatch, online } = useGame();
+  // Online, the explainer (or the host) fixes mistakes and confirms; everyone else watches.
+  const canEdit = !online || online.canControlTurn || online.isHost;
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: false, bottom: true });
   const team = currentTeam(state)!;
@@ -33,7 +35,7 @@ export function SummaryPanel() {
             {t.name} גנבו {awards[t.id] === 1 ? 'צעד אחד' : `${awards[t.id]} צעדים`}
           </Text>
         ))}
-        <Text style={styles.help}>טעיתם בסימון? הקישו על מילה כדי לשנות</Text>
+        {canEdit && <Text style={styles.help}>טעיתם בסימון? הקישו על מילה כדי לשנות</Text>}
 
         <FlatList
           style={styles.list}
@@ -48,6 +50,7 @@ export function SummaryPanel() {
               return (
                 <Pressable
                   onPress={() => dispatch({ type: 'CYCLE_WORD', index })}
+                  disabled={!canEdit}
                   style={({ pressed }) => [styles.row, item.isLastWord && styles.lastRow, pressed && { opacity: 0.7 }]}
                   accessibilityRole="button"
                   accessibilityLabel={`${item.word}, ${guesser ? `ניחשו ${guesser.name}` : 'אף אחד לא ניחש'}. הקשה משנה`}
@@ -68,6 +71,7 @@ export function SummaryPanel() {
             return (
               <Pressable
                 onPress={() => dispatch({ type: 'TOGGLE_WORD', index })}
+                disabled={!canEdit}
                 style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
                 accessibilityRole="button"
                 accessibilityLabel={`${item.word}, ${ok ? 'נכון' : 'דילוג'}. הקשה משנה`}
@@ -81,7 +85,11 @@ export function SummaryPanel() {
           }}
         />
 
-        <BigButton label="אישור והמשך" variant="light" large onPress={() => dispatch({ type: 'CONFIRM_TURN' })} />
+        {canEdit ? (
+          <BigButton label="אישור והמשך" variant="light" large onPress={() => dispatch({ type: 'CONFIRM_TURN' })} />
+        ) : (
+          <Text style={styles.help}>ממתינים ש{online?.explainer?.name} יאשר/תאשר את התור…</Text>
+        )}
       </View>
     </View>
   );

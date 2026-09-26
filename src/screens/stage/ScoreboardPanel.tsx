@@ -1,17 +1,19 @@
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Avatar } from '../../components/Avatar';
 import { BigButton } from '../../components/BigButton';
 import { MuteButton } from '../../components/MuteButton';
 import { currentTeam, wordIndexFor } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import { colors } from '../../theme';
+import { serverNow } from '../../online/serverTime';
 import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
 /** Between turns: standings on top, whose turn it is and the start button at the bottom. */
 export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
-  const { state, dispatch } = useGame();
+  const { state, dispatch, online } = useGame();
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: true, bottom: true });
   const next = currentTeam(state)!;
@@ -19,17 +21,24 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
   const wordNo = wordIndexFor(next.score) + 1;
 
   const quit = () => {
-    const leave = () => dispatch({ type: 'BACK_TO_SETUP' });
+    // Online: the host ends the game for everyone (back to the lobby); others just leave.
+    const [message, leave] = !online
+      ? ['לצאת מהמשחק? הניקוד יימחק.', () => dispatch({ type: 'BACK_TO_SETUP' })]
+      : online.isHost
+        ? ['לסיים את המשחק לכולם ולחזור ללובי?', () => dispatch({ type: 'BACK_TO_SETUP' })]
+        : ['לצאת מהמשחק? אפשר לחזור עם הקישור.', online.leave];
     if (Platform.OS === 'web') {
       // Alert with buttons is not supported on web.
-      if (globalThis.confirm?.('לצאת מהמשחק? הניקוד יימחק.')) leave();
+      if (globalThis.confirm?.(message)) leave();
       return;
     }
-    Alert.alert('יציאה מהמשחק', 'הניקוד יימחק. להמשיך?', [
+    Alert.alert('יציאה מהמשחק', message, [
       { text: 'ביטול', style: 'cancel' },
       { text: 'יציאה', style: 'destructive', onPress: leave },
     ]);
   };
+  const explainer = online?.explainer;
+  const canStartTurn = !online || online.canControlTurn;
 
   return (
     <View style={panel.layer} pointerEvents="box-none">
@@ -80,6 +89,14 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
               התור של: <Text style={panel.bold}>{next.name}</Text>
             </Text>
           </View>
+          {explainer && (
+            <View style={[panel.row, { justifyContent: 'center', gap: 6 }]}>
+              <Avatar name={explainer.name} photo={explainer.photo} size={24} />
+              <Text style={panel.text}>
+                {online?.amExplainer ? 'את/ה מסביר/ה בתור הזה!' : `מסביר/ה: ${explainer.name}`}
+              </Text>
+            </View>
+          )}
           <Text style={panel.hint}>
             הפיון על משבצת {wordNo}, לכן מסבירים את מילה {wordNo} בכל קלף · גררו לסיבוב הלוח, צבטו לזום
           </Text>
@@ -87,13 +104,23 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
             <Text style={styles.steal}>⚡ תור גניבה! כל הקבוצות מנחשות בו זמנית – מי שמנחש ראשון מקבל את הצעד</Text>
           )}
         </View>
-        <BigButton label="התחלת תור ⏳" variant="primary" large onPress={() => dispatch({ type: 'BEGIN_TURN' })} />
+        {canStartTurn ? (
+          <BigButton
+            label="התחלת תור ⏳"
+            variant="primary"
+            large
+            onPress={() => dispatch({ type: 'BEGIN_TURN', now: serverNow() })}
+          />
+        ) : (
+          <Text style={[panel.pill, styles.waiting]}>ממתינים ש{explainer?.name} יתחיל/תתחיל את התור…</Text>
+        )}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  waiting: { alignSelf: 'center', color: colors.white, fontWeight: '800', fontSize: 17, textAlign: 'center' },
   steal: {
     marginTop: 4,
     color: colors.ink,

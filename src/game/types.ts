@@ -2,6 +2,13 @@ export type Phase = 'setup' | 'scoreboard' | 'turn' | 'summary' | 'winner';
 
 export type WordResult = 'correct' | 'skipped';
 
+/** A signed-in player (online games). */
+export interface Player {
+  id: string;
+  name: string;
+  photo?: string | null;
+}
+
 export interface Team {
   id: string;
   name: string;
@@ -10,6 +17,21 @@ export interface Team {
   score: number;
   /** Landed on / passed a steal square: the team's next turn is a steal turn. */
   stealNext?: boolean;
+  /** Online games: the team's players, who take turns explaining. */
+  players?: Player[];
+  /** How many turns the team has played (picks the next explainer). */
+  turnsPlayed?: number;
+}
+
+/**
+ * The turn clock, in (server-synchronised) epoch milliseconds, so every device
+ * shows the same time left. The sand timer flips first; the clock runs from startAt.
+ */
+export interface TurnClock {
+  startAt: number;
+  durationMs: number;
+  pausedAt: number | null;
+  pausedMs: number;
 }
 
 export interface TurnWord {
@@ -50,6 +72,8 @@ export interface GameState {
   currentWord: string | null;
   turnWords: TurnWord[];
   winnerId: string | null;
+  /** The running turn's clock (null outside a turn). */
+  clock: TurnClock | null;
   /** This game's steal squares (random per game). */
   stealSquares: number[];
   /** This turn is a steal turn: all teams guess at the same time. */
@@ -59,8 +83,10 @@ export interface GameState {
 }
 
 export type GameAction =
-  | { type: 'START_GAME'; teamNames: string[]; settings: Settings }
-  | { type: 'BEGIN_TURN' }
+  | { type: 'START_GAME'; teamNames: string[]; settings: Settings; teamPlayers?: Player[][] }
+  | { type: 'BEGIN_TURN'; now: number }
+  | { type: 'PAUSE'; now: number }
+  | { type: 'RESUME'; now: number }
   /** In a steal turn, `teamId` is the team that guessed the word (defaults to the explaining team). */
   | { type: 'ANSWER'; result: WordResult; teamId?: string }
   | { type: 'LAST_WORD'; teamId: string | null }

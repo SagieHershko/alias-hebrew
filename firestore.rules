@@ -1,0 +1,90 @@
+rules_version = '2';
+
+// Alias (אליאס) online rooms. Paste into Firebase console → Firestore → Rules,
+// or deploy with `firebase deploy --only firestore:rules`.
+//
+// Security model
+// - Only signed-in (Google) users. Rooms are private: you can open a room only if you
+//   know its code (from the invite link); listing / scanning rooms is not allowed.
+// - A player may only add / change / remove their own entry (join, pick a team, leave).
+// - Only room members may change the game; only the host may change the room settings.
+// - Every write is validated (field types and sizes, at most 20 players, 2–6 teams).
+// - Rate limit: a room accepts at most one game / settings change every 100 ms.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /rooms/{code} {
+      function signedIn() { return request.auth != null; }
+      function uid() { return request.auth.uid; }
+      function before() { return resource.data; }
+      function after() { return request.resource.data; }
+      function isMember() { return signedIn() && uid() in before().players; }
+      function isHost() { return signedIn() && before().hostUid == uid(); }
+      function changed() { return after().diff(before()).affectedKeys(); }
+
+      function validPlayer(p) {
+        return p.keys().hasOnly(['name', 'photo', 'teamIndex', 'joinedAt'])
+          && p.name is string && p.name.size() > 0 && p.name.size() <= 60
+          && (p.photo == null || (p.photo is string && p.photo.size() <= 2048))
+          && (p.teamIndex == null || (p.teamIndex is int && p.teamIndex >= 0 && p.teamIndex < 6))
+          && p.joinedAt is number;
+      }
+      function validSettings(s) {
+        return s.keys().hasOnly(['targetScore', 'turnSeconds', 'skipPenalty'])
+          && s.targetScore is int && s.targetScore >= 10 && s.targetScore <= 100
+          && s.turnSeconds is int && s.turnSeconds >= 10 && s.turnSeconds <= 180
+          && s.skipPenalty is bool;
+      }
+      function validRoom(d) {
+        return d.keys().hasOnly(['code', 'hostUid', 'status', 'createdAt', 'updatedAt', 'players',
+                                 'teamNames', 'settings', 'game', 'rev'])
+          && d.code == code
+          && d.status in ['lobby', 'playing']
+          && d.players is map && d.players.size() <= 20
+          && d.teamNames is list && d.teamNames.size() >= 2 && d.teamNames.size() <= 6
+          && validSettings(d.settings)
+          && (d.game == null || (d.game is string && d.game.size() < 300000))
+          && d.rev is int;
+      }
+      // Stamped with the server time on every game / settings write…
+      function stamped() { return after().updatedAt == request.time; }
+      // …and at most one such write every 100 ms per room.
+      function notTooFast() { return request.time > before().updatedAt + duration.value(100, 'ms'); }
+
+      // A player changes only their own entry, and it must be valid (or removed).
+      function onlyMyPlayerEntry() {
+        return changed().hasOnly(['players'])
+          && after().players.diff(before().players).affectedKeys().hasOnly([uid()])
+          && (!(uid() in after().players) || validPlayer(after().players[uid()]));
+      }
+
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && after().hostUid == uid()
+        && uid() in after().players && validPlayer(after().players[uid()])
+        && after().players.size() == 1
+        && after().status == 'lobby' && after().game == null && after().rev == 0
+        && stamped()
+        && validRoom(after());
+
+      allow update: if validRoom(after()) && (
+        onlyMyPlayerEntry()
+        || (isMember() && changed().hasOnly(['game', 'rev', 'updatedAt'])
+            && after().rev == before().rev + 1 && stamped() && notTooFast())
+        || (isHost() && !changed().hasAny(['hostUid', 'code', 'createdAt'])
+            && stamped() && notTooFast())
+      );
+
+      allow delete: if isHost();
+
+      // Clock-sync pings: each player writes only their own, a single server timestamp.
+      match /clock/{player} {
+        allow read: if request.auth != null && request.auth.uid == player;
+        allow write: if request.auth != null && request.auth.uid == player
+          && request.resource.data.keys().hasOnly(['t']) && request.resource.data.t == request.time;
+      }
+    }
+  }
+}

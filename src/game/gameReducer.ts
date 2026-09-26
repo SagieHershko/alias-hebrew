@@ -1,7 +1,7 @@
 import { WORDS, WORDS_PER_CARD } from '../data/words';
 import { TEAM_COLORS } from '../theme';
 import { crossesStealSquare, generateStealSquares } from './board';
-import type { GameAction, GameState, Settings, Team, TurnWord } from './types';
+import type { GameAction, GameState, Player, Settings, Team, TurnClock, TurnWord } from './types';
 
 export const MIN_TEAMS = 2;
 export const MAX_TEAMS = 6;
@@ -28,7 +28,30 @@ export const initialState: GameState = {
   previousScores: {},
   stealTurn: false,
   stealSquares: [],
+  clock: null,
 };
+
+/** How long the sand timer takes to flip over before the turn clock starts. */
+export const TIMER_FLIP_MS = 900;
+
+/** Milliseconds left on the turn clock at `now` (the full turn before it starts). */
+export function clockRemaining(clock: TurnClock, now: number): number {
+  const elapsed = (clock.pausedAt ?? now) - clock.startAt - clock.pausedMs;
+  return Math.min(clock.durationMs, Math.max(0, clock.durationMs - Math.max(0, elapsed)));
+}
+
+/** Has the clock started running (the sand timer finished flipping)? */
+export function clockStarted(clock: TurnClock, now: number): boolean {
+  return (clock.pausedAt ?? now) >= clock.startAt;
+}
+
+/** Online games: the player who explains this turn; teammates take turns in order. */
+export function currentExplainer(state: GameState): Player | null {
+  const team = state.teams[state.currentTeamIndex];
+  const players = team?.players ?? [];
+  if (players.length === 0) return null;
+  return players[(team.turnsPlayed ?? 0) % players.length];
+}
 
 export function shuffle<T>(items: readonly T[]): T[] {
   const copy = [...items];
@@ -113,6 +136,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         name,
         color: TEAM_COLORS[i % TEAM_COLORS.length],
         score: 0,
+        turnsPlayed: 0,
+        ...(action.teamPlayers ? { players: action.teamPlayers[i] ?? [] } : {}),
       }));
       return {
         ...initialState,
@@ -130,8 +155,26 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const wordIndex = wordIndexFor(active.score);
       // A pending steal turn is used up now.
       const teams = state.teams.map((t) => (t.id === active.id ? { ...t, stealNext: false } : t));
-      const next = { ...state, teams, wordIndex, stealTurn: !!active.stealNext };
+      const clock: TurnClock = {
+        startAt: action.now + TIMER_FLIP_MS,
+        durationMs: state.settings.turnSeconds * 1000,
+        pausedAt: null,
+        pausedMs: 0,
+      };
+      const next = { ...state, teams, wordIndex, stealTurn: !!active.stealNext, clock };
       return { ...next, ...drawCard(next, []), phase: 'turn', turnWords: [] };
+    }
+
+    case 'PAUSE': {
+      if (state.phase !== 'turn' || !state.clock || state.clock.pausedAt !== null) return state;
+      if (!clockStarted(state.clock, action.now) || clockRemaining(state.clock, action.now) === 0) return state;
+      return { ...state, clock: { ...state.clock, pausedAt: action.now } };
+    }
+
+    case 'RESUME': {
+      if (state.phase !== 'turn' || !state.clock || state.clock.pausedAt === null) return state;
+      const pausedMs = state.clock.pausedMs + Math.max(0, action.now - state.clock.pausedAt);
+      return { ...state, clock: { ...state.clock, pausedAt: null, pausedMs } };
     }
 
     case 'ANSWER': {
@@ -160,13 +203,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         turnWords: [...state.turnWords, lastWord],
         currentWord: null,
         currentCard: null,
+        clock: null,
       };
     }
 
     case 'END_TURN': {
       if (state.phase !== 'turn') return state;
       // An unanswered card on screen is simply discarded (it is not scored either way).
-      return { ...state, phase: 'summary', currentWord: null, currentCard: null };
+      return { ...state, phase: 'summary', currentWord: null, currentCard: null, clock: null };
     }
 
     case 'TOGGLE_WORD': {
@@ -200,6 +244,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const previousScores = Object.fromEntries(state.teams.map((t) => [t.id, t.score]));
       const clamp = (n: number) => Math.min(target, Math.max(0, n));
       const teams = state.teams.map((t) => {
+        // The explaining team has played one more turn: next time, the next teammate explains.
+        if (t.id === activeId) t = { ...t, turnsPlayed: (t.turnsPlayed ?? 0) + 1 };
         if (!awards[t.id]) return t;
         const score = clamp(t.score + awards[t.id]);
         // Landing on or passing a steal square makes the team's next turn a steal turn.
@@ -229,7 +275,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...initialState,
         phase: 'scoreboard',
         settings: state.settings,
-        teams: state.teams.map((t) => ({ ...t, score: 0, stealNext: false })),
+        teams: state.teams.map((t) => ({ ...t, score: 0, stealNext: false, turnsPlayed: 0 })),
         deck: dealCards(),
         stealSquares: generateStealSquares(state.settings.targetScore),
       };

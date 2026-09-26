@@ -5,6 +5,7 @@ import { PanResponder, Platform, StyleSheet, View, type StyleProp, type ViewStyl
 import * as THREE from 'three';
 
 import type { Team } from '../game/types';
+import { TIMER_FLIP_MS } from '../game/gameReducer';
 import { playSound } from '../sound/sounds';
 import { computeLayout, type BoardLayout } from './boardLayout';
 import { LivingRoom } from './LivingRoom';
@@ -23,8 +24,6 @@ const BOARD_HEIGHT = 0.22;
 const TOP = BOARD_HEIGHT + DISC_HEIGHT; // y of the disc tops, where pawns stand
 const HOP_SPEED = 3.2; // squares per second
 const HOP_DELAY = 0.7; // seconds before pawns start moving
-/** How long the sand timer takes to flip over at the start of a turn. */
-export const TIMER_FLIP_MS = 900;
 const CARD_FLIGHT = 0.5; // seconds for a card to fly from the deck to the camera
 
 const MIN_ELEVATION = THREE.MathUtils.degToRad(18);

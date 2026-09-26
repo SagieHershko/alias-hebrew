@@ -9,7 +9,8 @@ import { useStageInsets } from './stageInsets';
 
 /** The winners' pawn dances on the finish disc while this sheet celebrates them. */
 export function WinnerPanel() {
-  const { state, dispatch } = useGame();
+  const { state, dispatch, online } = useGame();
+  const canRestart = !online || online.isHost;
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: false, bottom: true });
   const winner = state.teams.find((t) => t.id === state.winnerId);
@@ -23,8 +24,21 @@ export function WinnerPanel() {
           <Text style={styles.winnerName}>{winner?.name}</Text>
         </View>
         <Text style={panel.hint}>הגיעו ראשונים ל✌ אחרי {state.round} סיבובים</Text>
-        <BigButton label="משחק חוזר" variant="primary" large onPress={() => dispatch({ type: 'REMATCH' })} />
-        <BigButton label="קבוצות חדשות" variant="ghost" onPress={() => dispatch({ type: 'BACK_TO_SETUP' })} />
+        {canRestart ? (
+          <>
+            <BigButton label="משחק חוזר" variant="primary" large onPress={() => dispatch({ type: 'REMATCH' })} />
+            <BigButton
+              label={online ? 'חזרה ללובי' : 'קבוצות חדשות'}
+              variant="ghost"
+              onPress={() => dispatch({ type: 'BACK_TO_SETUP' })}
+            />
+          </>
+        ) : (
+          <>
+            <Text style={panel.hint}>המארח/ת יכול/ה להתחיל משחק חוזר</Text>
+            <BigButton label="יציאה" variant="ghost" onPress={online!.leave} />
+          </>
+        )}
       </View>
     </View>
   );

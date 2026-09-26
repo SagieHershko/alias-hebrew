@@ -16,14 +16,13 @@ import { AliasLogo } from '../components/AliasLogo';
 import { generateStealSquares } from '../game/board';
 import { Board3D } from '../three/Board3D';
 import { BigButton } from '../components/BigButton';
+import { Chips, SECONDS_OPTIONS, TARGET_OPTIONS } from '../components/Chips';
 import { MAX_TEAMS, MIN_TEAMS } from '../game/gameReducer';
 import { useGame } from '../game/GameContext';
 import type { Team } from '../game/types';
 import { colors, radius, TEAM_COLORS } from '../theme';
 
 const SUGGESTED_NAMES = ['האריות', 'הנשרים', 'הכרישים', 'הנמרים', 'הדובים', 'הזאבים'];
-const TARGET_OPTIONS = [20, 30, 40, 50];
-const SECONDS_OPTIONS = [30, 45, 60];
 
 const RULES = [
   'מתחלקים ל־2 עד 6 קבוצות (4 עד 12 שחקנים).',
@@ -36,7 +35,7 @@ const RULES = [
   'הקבוצה הראשונה שמגיעה למשבצת הסיום – מנצחת!',
 ];
 
-export function SetupScreen() {
+export function SetupScreen({ onBack }: { onBack?: () => void }) {
   const { state, dispatch } = useGame();
   const insets = useSafeAreaInsets();
   const [names, setNames] = useState<string[]>(() =>
@@ -86,6 +85,16 @@ export function SetupScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
       >
+        {onBack && (
+          <Pressable
+            onPress={onBack}
+            style={styles.back}
+            accessibilityRole="button"
+            accessibilityLabel="חזרה למסך הבית"
+          >
+            <Text style={styles.backText}>→ חזרה</Text>
+          </Pressable>
+        )}
         <View style={styles.hero}>
           <Board3D teams={previewTeams} target={target} stealSquares={previewSteal} style={styles.heroBoard} />
           <View style={styles.logo} pointerEvents="none">
@@ -166,30 +175,17 @@ export function SetupScreen() {
   );
 }
 
-function Chips({ options, value, onChange }: { options: number[]; value: number; onChange: (v: number) => void }) {
-  return (
-    <View style={styles.chips}>
-      {options.map((o) => {
-        const selected = o === value;
-        return (
-          <Pressable
-            key={o}
-            onPress={() => onChange(o)}
-            style={[styles.chip, selected && styles.chipSelected]}
-            accessibilityRole="radio"
-            accessibilityState={{ selected }}
-          >
-            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{o}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: 16, gap: 16 },
+  back: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  backText: { color: colors.white, fontWeight: '800', fontSize: 15 },
   hero: { marginTop: 56 },
   heroBoard: { height: 230, borderRadius: radius.lg },
   logo: { position: 'absolute', top: -56, alignSelf: 'center' },
@@ -238,19 +234,6 @@ const styles = StyleSheet.create({
   addBtn: { marginTop: 4, borderColor: colors.red, borderStyle: 'dashed' },
   error: { color: colors.skip, fontWeight: '700' },
   label: { fontSize: 16, fontWeight: '700', color: colors.ink },
-  chips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chip: {
-    minWidth: 56,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    borderColor: colors.red,
-    alignItems: 'center',
-  },
-  chipSelected: { backgroundColor: colors.red },
-  chipText: { color: colors.red, fontWeight: '800', fontSize: 16 },
-  chipTextSelected: { color: colors.white },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rulesToggle: { alignSelf: 'center', padding: 6 },
   rulesToggleText: { color: colors.white, fontSize: 18, fontWeight: '800' },

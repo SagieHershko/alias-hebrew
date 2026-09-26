@@ -1,23 +1,25 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
+import { GuessCard } from '../../components/GuessCard';
 import { MuteButton } from '../../components/MuteButton';
 import { WordCard } from '../../components/WordCard';
 import { currentTeam, turnPoints } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import type { WordResult } from '../../game/types';
-import { useCountdown } from '../../hooks/useCountdown';
+import { useTurnClock } from '../../hooks/useTurnClock';
+import { serverNow } from '../../online/serverTime';
 import { colors, radius, readableOn, shadow } from '../../theme';
 import { playSound } from '../../sound/sounds';
-import { TIMER_FLIP_MS, type SandState } from '../../three/Board3D';
+import type { SandState } from '../../three/Board3D';
 import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
+/** Vibration on the device that pressed (sounds play on every device, from the game state). */
 function buzz(kind: WordResult | 'timeUp') {
-  playSound(kind === 'correct' ? 'correct' : kind === 'skipped' ? 'skip' : 'timeup');
   const p =
     kind === 'correct'
       ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -47,12 +49,19 @@ interface Props {
  * the first card rises from the deck. נכון / דלג send the card away and draw the next.
  */
 export function TurnPanel({ sand, onCardShown }: Props) {
-  const { state, dispatch } = useGame();
+  const { state, dispatch, online } = useGame();
+  // Online, only the explainer's phone shows the words and marks answers.
+  const canAct = !online || online.canControlTurn;
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: false, bottom: true });
   const team = currentTeam(state)!;
   const total = state.settings.turnSeconds;
-  const timer = useCountdown(total, () => buzz('timeUp'), TIMER_FLIP_MS);
+  const timer = useTurnClock(state.clock, () => {
+    playSound('timeup');
+    buzz('timeUp');
+  });
+  const pause = () => dispatch({ type: 'PAUSE', now: serverNow() });
+  const resume = () => dispatch({ type: 'RESUME', now: serverNow() });
   const lastWord = timer.expired;
   const [leaving, setLeaving] = useState<LeavingCard[]>([]);
 
@@ -88,15 +97,41 @@ export function TurnPanel({ sand, onCardShown }: Props) {
     if (timer.started) onCardShown(state.cardsDrawn);
   }, [timer.started, state.cardsDrawn, onCardShown]);
 
+  // A chime / whoosh on every phone whenever a word is answered.
+  const answered = useRef(state.turnWords.length);
+  useEffect(() => {
+    const n = state.turnWords.length;
+    if (n > answered.current) {
+      const w = state.turnWords[n - 1];
+      const guessed = w.guessedBy !== undefined ? w.guessedBy !== null : w.result === 'correct';
+      playSound(guessed ? 'correct' : 'skip');
+    }
+    answered.current = n;
+  }, [state.turnWords]);
+
   const correctCount = state.turnWords.filter((w) => w.result === 'correct').length;
   const skippedCount = state.turnWords.length - correctCount;
   const points = turnPoints(state.turnWords, state.settings, team.id);
   // The explaining team first, then everyone else.
   const guessers = [team, ...state.teams.filter((t) => t.id !== team.id)];
+  // What a guesser's phone says (online).
+  const myTeamActive = online?.myTeamId === team.id;
+  const guessMessage = state.stealTurn
+    ? {
+        headline: 'כולם מנחשים!',
+        detail: `תור גניבה – ${online?.explainer?.name} מסביר/ה, מי שמנחש ראשון מקבל את הצעד`,
+      }
+    : myTeamActive
+      ? { headline: 'נחשו!', detail: `${online?.explainer?.name} מסביר/ה לקבוצה שלכם` }
+      : { headline: `${team.name} מנחשים`, detail: `${online?.explainer?.name} מסביר/ה · חכו לתור שלכם` };
   const title = `${team.name} מסבירים · מילה ${state.wordIndex + 1}${state.stealTurn ? ' · תור גניבה' : ''}`;
 
+  // Ignore an accidental double tap (one card per tap).
+  const lastTap = useRef(0);
   const answer = (result: WordResult, teamId?: string) => {
     if (timer.paused || !state.currentCard) return;
+    if (Date.now() - lastTap.current < 250) return;
+    lastTap.current = Date.now();
     buzz(result);
     setLeaving((cards) => [...cards, { key: state.cardsDrawn, words: state.currentCard!, result }]);
     dispatch({ type: 'ANSWER', result, teamId });
@@ -125,6 +160,7 @@ export function TurnPanel({ sand, onCardShown }: Props) {
   );
   const awardLastWord = (teamId: string | null) => {
     buzz(teamId ? 'correct' : 'skipped');
+    playSound(teamId ? 'correct' : 'skip');
     dispatch({ type: 'LAST_WORD', teamId });
   };
 
@@ -151,9 +187,9 @@ export function TurnPanel({ sand, onCardShown }: Props) {
               <Text style={styles.pointsText}>{points > 0 ? `+${points}` : points}</Text>
             </View>
             <Pressable
-              onPress={timer.paused ? timer.resume : timer.pause}
-              disabled={lastWord || !timer.started}
-              style={[styles.stat, (lastWord || !timer.started) && styles.hidden]}
+              onPress={timer.paused ? resume : pause}
+              disabled={lastWord || !timer.started || !canAct}
+              style={[styles.stat, (lastWord || !timer.started || !canAct) && styles.hidden]}
               accessibilityRole="button"
               accessibilityLabel={timer.paused ? 'המשך' : 'השהיה'}
             >
@@ -178,7 +214,12 @@ export function TurnPanel({ sand, onCardShown }: Props) {
                 />
               </View>
             ))}
-            {timer.started && state.currentCard && (
+            {timer.started && !canAct && (
+              <View style={styles.cardSlot}>
+                <GuessCard explainer={online?.explainer ?? null} {...guessMessage} />
+              </View>
+            )}
+            {timer.started && canAct && state.currentCard && (
               <View key={`in-${state.cardsDrawn}`} style={styles.cardSlot}>
                 <WordCard
                   title={title}
@@ -192,7 +233,15 @@ export function TurnPanel({ sand, onCardShown }: Props) {
         </View>
 
         <View style={[styles.actions, { paddingBottom: insets.bottom + 14 }]}>
-          {lastWord ? (
+          {!canAct ? (
+            <Text style={styles.lastTitle}>
+              {lastWord
+                ? `מילה אחרונה – ${online?.explainer?.name} יסמן/תסמן מי ניחש`
+                : timer.paused
+                  ? 'המשחק מושהה'
+                  : `${online?.explainer?.name} מסמן/ת את התשובות`}
+            </Text>
+          ) : lastWord ? (
             <>
               <Text style={styles.lastTitle}>החול נגמר! מילה אחרונה – מי ניחש?</Text>
               {teamButtons(awardLastWord)}
