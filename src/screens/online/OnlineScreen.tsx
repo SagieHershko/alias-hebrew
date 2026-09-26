@@ -44,13 +44,15 @@ function OnlineFlow({ initialCode, onExit }: { initialCode: string | null; onExi
     setUrlRoom(code);
     joinRoom(code, user)
       .then(() => syncServerClock(code, user.uid))
-      .catch((e: Error) =>
+      .catch((e: Error & { code?: string }) =>
         setError(
           e.message === 'not-found'
             ? 'לא מצאנו חדר עם הקוד הזה'
-            : e.message === 'full'
-              ? 'החדר מלא (עד 20 שחקנים)'
-              : 'ההצטרפות לחדר נכשלה, נסו שוב',
+            : e.code === 'permission-denied'
+              ? 'החדר לא נמצא או שפג תוקפו (חדרים נסגרים אחרי יומיים)'
+              : e.message === 'full'
+                ? 'החדר מלא (עד 20 שחקנים)'
+                : 'ההצטרפות לחדר נכשלה, נסו שוב',
         ),
       );
   }, [user, code]);

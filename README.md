@@ -82,7 +82,7 @@ These are public client settings, not secrets. Access is enforced by the securit
   - Players can only change their own entry, only members can change the game, and only the host can change settings.
   - Every write is validated: field types and sizes, at most 20 players, 2–6 teams, the game under 300 KB.
   - Clock-sync pings can only be written by members of an existing room.
-- **Old rooms are deleted automatically** 2 days after creation: set up a TTL policy once (below).
+- **Rooms expire** 2 days after creation: they can no longer be opened, joined or played (old codes are useless).
 - **Rate limit:** a room accepts at most one game or settings change every 100 ms (enforced by the server rules). The app spaces writes 120 ms apart, ignores double taps, and caps queued actions.
 - **Consistency:** every action runs in a Firestore transaction (read → pure reducer → write), with retries and exponential backoff on contention or network errors. A lost connection shows a notice, and corrupt data never crashes the screen (an error boundary catches the rest).
 - **Tested** against the Firebase emulators:
@@ -93,7 +93,7 @@ These are public client settings, not secrets. Access is enforced by the securit
 
 ### Hardening (recommended for a public launch)
 
-1. **TTL (auto-delete old rooms):** Google Cloud console → Firestore → **Time-to-live** → **Create policy**: collection group `rooms`, timestamp field `expiresAt`. Repeat for collection group `clock`, field `expiresAt`.
+1. **Deleting old rooms:** on the free Spark plan, delete them now and then from Firebase console → Firestore → Data (the free 1 GiB holds many thousands of rooms). With billing enabled (Blaze), a TTL policy does it automatically: Google Cloud console → Firestore → **Time-to-live** → collection group `rooms`, field `expiresAt`, and again for `clock`.
 2. **[App Check](https://firebase.google.com/docs/app-check)** — only your site can use the project, so scripts can't guess room codes or burn the daily quota:
    - Firebase console → **App Check** → **Apps** → your web app → **reCAPTCHA Enterprise** → create a key for your Vercel domain → **Save**.
    - Vercel: add `EXPO_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` = that site key, then redeploy.

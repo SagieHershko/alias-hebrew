@@ -77,6 +77,16 @@ await env.withSecurityRulesDisabled(async (ctx) => {
 });
 await t('21st player cannot join (max 20)', assertFails(updateDoc(doc(db('late'), 'rooms', 'FULLL'), { 'players.late': player('Late', null) })));
 
+console.log('Expiry');
+await t('a room that does not exist reads as not found', assertSucceeds(getDoc(doc(db('bob'), 'rooms', 'NOPE0'))));
+await env.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'rooms', 'OLDDD'), { ...room({ code: 'OLDDD', players: { host: player('Host'), bob: player('Bob') } }), updatedAt: new Date(0), expiresAt: expiry(-1) });
+});
+await t('an expired room cannot be opened', assertFails(getDoc(doc(db('bob'), 'rooms', 'OLDDD'))));
+await t('nobody can join an expired room', assertFails(updateDoc(doc(db('eve'), 'rooms', 'OLDDD'), { 'players.eve': player('Eve', null) })));
+await t('members cannot play in an expired room', assertFails(updateDoc(doc(db('bob'), 'rooms', 'OLDDD'), { game: '{"x":1}', rev: 1, updatedAt: serverTimestamp() })));
+await t('no clock pings in an expired room', assertFails(setDoc(doc(db('bob'), 'rooms/OLDDD/clock/bob'), { t: serverTimestamp(), expiresAt: expiry() })));
+
 console.log('Clock sync & delete');
 await t('player writes own clock ping', assertSucceeds(setDoc(doc(db('bob'), 'rooms/ABCDE/clock/bob'), { t: serverTimestamp() })));
 await t('cannot write another player\'s ping', assertFails(setDoc(doc(db('bob'), 'rooms/ABCDE/clock/host'), { t: serverTimestamp() })));

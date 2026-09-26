@@ -10,8 +10,9 @@ rules_version = '2';
 // - Only room members may change the game; only the host may change the room settings.
 // - Every write is validated (field types and sizes, at most 20 players, 2–6 teams).
 // - Rate limit: a room accepts at most one game / settings change every 100 ms.
-// - Rooms expire: expiresAt (set once, at creation) drives a Firestore TTL policy that
-//   deletes old rooms and clock pings automatically.
+// - Rooms expire: expiresAt is set once, at creation. After it, the room can no longer be
+//   opened or changed (so old codes are useless). On a billing-enabled project it can also
+//   drive a Firestore TTL policy that deletes old rooms and clock pings.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -23,6 +24,8 @@ service cloud.firestore {
       function isMember() { return signedIn() && uid() in before().players; }
       function isHost() { return signedIn() && before().hostUid == uid(); }
       function changed() { return after().diff(before()).affectedKeys(); }
+      // Rooms from before expiresAt existed have none, and never expire.
+      function live(d) { return d.get('expiresAt', null) == null || d.expiresAt > request.time; }
 
       function validPlayer(p) {
         return p.keys().hasOnly(['name', 'photo', 'teamIndex', 'joinedAt'])
@@ -60,7 +63,8 @@ service cloud.firestore {
           && (!(uid() in after().players) || validPlayer(after().players[uid()]));
       }
 
-      allow get: if signedIn();
+      // A missing room reads as "not found" (so a new code can be checked before creating it).
+      allow get: if signedIn() && (resource == null || live(resource.data));
       allow list: if false;
 
       allow create: if signedIn()
@@ -73,7 +77,7 @@ service cloud.firestore {
         && after().expiresAt > request.time && after().expiresAt <= request.time + duration.value(3, 'd')
         && validRoom(after());
 
-      allow update: if validRoom(after()) && (
+      allow update: if live(before()) && validRoom(after()) && (
         onlyMyPlayerEntry()
         || (isMember() && changed().hasOnly(['game', 'rev', 'updatedAt'])
             && after().rev == before().rev + 1 && stamped() && notTooFast())
@@ -84,10 +88,13 @@ service cloud.firestore {
       allow delete: if isHost();
 
       // Clock-sync pings: each member of the room writes only their own, a server timestamp
-      // (plus an expiry for the TTL policy).
+      // (plus an expiry), in a live room.
       match /clock/{player} {
         function roomPath() { return /databases/$(database)/documents/rooms/$(code); }
-        function isRoomMember() { return exists(roomPath()) && player in get(roomPath()).data.players; }
+        function isRoomMember() {
+          return exists(roomPath()) && player in get(roomPath()).data.players
+            && (get(roomPath()).data.get('expiresAt', null) == null || get(roomPath()).data.expiresAt > request.time);
+        }
         allow read: if request.auth != null && request.auth.uid == player;
         allow write: if request.auth != null && request.auth.uid == player && isRoomMember()
           && request.resource.data.keys().hasOnly(['t', 'expiresAt'])
