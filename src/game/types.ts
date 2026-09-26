@@ -39,6 +39,8 @@ export interface GameState {
   currentWord: string | null;
   turnWords: TurnWord[];
   winnerId: string | null;
+  /** Scores before the last confirmed turn, so the board can animate the pawns' moves. */
+  previousScores: Record<string, number>;
 }
 
 export type GameAction =

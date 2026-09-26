@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,9 +13,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AliasLogo } from '../components/AliasLogo';
+import { Board3D } from '../three/Board3D';
 import { BigButton } from '../components/BigButton';
 import { MAX_TEAMS, MIN_TEAMS } from '../game/gameReducer';
 import { useGame } from '../game/GameContext';
+import type { Team } from '../game/types';
 import { colors, radius, TEAM_COLORS } from '../theme';
 
 const SUGGESTED_NAMES = ['האריות', 'הנשרים', 'הכרישים', 'הנמרים', 'הדובים', 'הזאבים'];
@@ -60,6 +62,12 @@ export function SetupScreen() {
   const rename = (index: number, value: string) =>
     setNames(names.map((n, i) => (i === index ? value : n)));
 
+  // Live preview: one pawn per team waiting on the start square.
+  const previewTeams: Team[] = useMemo(
+    () => names.map((name, i) => ({ id: `preview-${i}`, name, color: TEAM_COLORS[i], score: 0 })),
+    [names],
+  );
+
   const start = () =>
     dispatch({
       type: 'START_GAME',
@@ -80,8 +88,11 @@ export function SetupScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logo}>
-          <AliasLogo size={170} subtitle={'משחק מילים\nלכל המשפחה!'} />
+        <View style={styles.hero}>
+          <Board3D teams={previewTeams} target={target} style={styles.heroBoard} />
+          <View style={styles.logo} pointerEvents="none">
+            <AliasLogo size={112} subtitle={'משחק מילים\nלכל המשפחה!'} />
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -187,7 +198,9 @@ function Chips({
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: 16, gap: 16 },
-  logo: { alignItems: 'center', marginBottom: 4 },
+  hero: { marginTop: 56 },
+  heroBoard: { height: 230, borderRadius: radius.lg },
+  logo: { position: 'absolute', top: -56, alignSelf: 'center' },
   card: {
     backgroundColor: colors.white,
     borderRadius: radius.lg,

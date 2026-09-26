@@ -2,8 +2,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../components/BigButton';
-import { DigitalBoard } from '../components/DigitalBoard';
 import { useGame } from '../game/GameContext';
+import { Board3D } from '../three/Board3D';
 import { colors } from '../theme';
 
 export function WinnerScreen() {
@@ -22,7 +22,13 @@ export function WinnerScreen() {
         הגיעו ראשונים למשבצת הסיום אחרי {state.round} סיבובים
       </Text>
       <View style={styles.board}>
-        <DigitalBoard teams={state.teams} target={state.settings.targetScore} activeTeamId={winner?.id} />
+        <Board3D
+          teams={state.teams}
+          target={state.settings.targetScore}
+          fromScores={state.previousScores}
+          winnerId={winner?.id}
+          style={styles.board3d}
+        />
       </View>
       <View style={styles.actions}>
         <BigButton label="משחק חוזר" variant="light" large onPress={() => dispatch({ type: 'REMATCH' })} />
@@ -46,5 +52,6 @@ const styles = StyleSheet.create({
   winnerName: { fontSize: 32, fontWeight: '900', color: colors.red },
   subtitle: { fontSize: 16, color: colors.offWhite, textAlign: 'center' },
   board: { alignSelf: 'stretch', flex: 1, justifyContent: 'center' },
+  board3d: { flex: 1, maxHeight: 340, borderRadius: 20 },
   actions: { alignSelf: 'stretch', gap: 10 },
 });

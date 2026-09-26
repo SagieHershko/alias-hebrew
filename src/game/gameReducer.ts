@@ -21,6 +21,7 @@ export const initialState: GameState = {
   currentWord: null,
   turnWords: [],
   winnerId: null,
+  previousScores: {},
 };
 
 export function shuffle<T>(items: readonly T[]): T[] {
@@ -150,6 +151,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const activeId = state.teams[state.currentTeamIndex].id;
       const points = turnPoints(state.turnWords, state.settings, activeId);
       const thiefId = lastWordThief(state.turnWords, activeId);
+      const previousScores = Object.fromEntries(state.teams.map((t) => [t.id, t.score]));
       const clamp = (n: number) => Math.min(state.settings.targetScore, Math.max(0, n));
       const teams = state.teams.map((t) => {
         if (t.id === activeId) return { ...t, score: clamp(t.score + points) };
@@ -161,12 +163,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         .map((id) => teams.find((t) => t.id === id))
         .find((t) => t && t.score >= state.settings.targetScore);
       if (winner) {
-        return { ...state, teams, phase: 'winner', winnerId: winner.id, turnWords: [] };
+        return { ...state, teams, previousScores, phase: 'winner', winnerId: winner.id, turnWords: [] };
       }
       const nextIndex = (state.currentTeamIndex + 1) % teams.length;
       return {
         ...state,
         teams,
+        previousScores,
         phase: 'scoreboard',
         currentTeamIndex: nextIndex,
         round: nextIndex === 0 ? state.round + 1 : state.round,
