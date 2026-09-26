@@ -95,7 +95,8 @@ These are public client settings, not secrets. Access is enforced by the securit
 
 1. **Deleting old rooms:** on the free Spark plan, delete them now and then from Firebase console → Firestore → Data (the free 1 GiB holds many thousands of rooms). With billing enabled (Blaze), a TTL policy does it automatically: Google Cloud console → Firestore → **Time-to-live** → collection group `rooms`, field `expiresAt`, and again for `clock`.
 2. **[App Check](https://firebase.google.com/docs/app-check)** — only your site can use the project, so scripts can't guess room codes or burn the daily quota:
-   - Firebase console → **App Check** → **Apps** → your web app → **reCAPTCHA Enterprise** → create a key for your Vercel domain → **Save**.
+   - [google.com/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create): type **reCAPTCHA v3** (score based), domain = your Vercel domain → copy the site key and the secret key. No billing needed.
+   - Firebase console → **App Check** → **Apps** → your web app → **reCAPTCHA** → paste the secret key → **Save**.
    - Vercel: add `EXPO_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` = that site key, then redeploy.
    - After a day, check the App Check metrics show your traffic as verified, then **Enforce** for Cloud Firestore and Authentication.
 3. **Restrict the API key:** Google Cloud console → APIs & Services → **Credentials** → the "Browser key" → **Website restrictions**: `https://<your-app>.vercel.app/*` and `https://<project-id>.firebaseapp.com/*`.
