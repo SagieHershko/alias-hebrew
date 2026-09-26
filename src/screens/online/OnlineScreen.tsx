@@ -158,6 +158,7 @@ function CreateOrJoin({
 }) {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const code = normaliseCode(input);
   return (
     <Screen>
@@ -172,11 +173,17 @@ function CreateOrJoin({
           disabled={busy}
           onPress={() => {
             setBusy(true);
+            setCreateError(null);
             createRoom(user)
               .then(onRoom)
+              .catch((e: { code?: string; message?: string }) => {
+                console.error('createRoom failed', e);
+                setCreateError(`פתיחת החדר נכשלה, נסו שוב (${e.code ?? e.message ?? 'unknown'})`);
+              })
               .finally(() => setBusy(false));
           }}
         />
+        {createError && <Text style={styles.error}>{createError}</Text>}
       </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>הצטרפות עם קוד</Text>

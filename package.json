@@ -33,7 +33,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "emulators": "npx firebase-tools@15 emulators:start --only auth,firestore --project demo-alias",
-    "test:rules": "node tests/firestore-rules.test.mjs"
+    "test:rules": "node tests/firestore-rules.test.mjs",
+    "lint": "expo lint"
   },
   "private": true
 }
