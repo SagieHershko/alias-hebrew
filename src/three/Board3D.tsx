@@ -1,7 +1,7 @@
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { Asset } from 'expo-asset';
-import { Suspense, useLayoutEffect, useMemo, useRef } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Suspense, useMemo, useRef, type RefObject } from 'react';
+import { PanResponder, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import * as THREE from 'three';
 
 import type { Team } from '../game/types';
@@ -13,15 +13,64 @@ const CARD = require('../../assets/3d/card.png');
 
 const RED = '#E30613';
 const STAGE = '#2A2C31';
+const SAND = '#E2A93B';
 const DISC_RADIUS = 0.36;
 const DISC_HEIGHT = 0.07;
 const BOARD_HEIGHT = 0.22;
 const TOP = BOARD_HEIGHT + DISC_HEIGHT; // y of the disc tops, where pawns stand
 const HOP_SPEED = 3.2; // squares per second
 const HOP_DELAY = 0.7; // seconds before pawns start moving
+/** How long the sand timer takes to flip over at the start of a turn. */
+export const TIMER_FLIP_MS = 900;
+const CARD_FLIGHT = 0.5; // seconds for a card to fly from the deck to the camera
+
+const MIN_ELEVATION = THREE.MathUtils.degToRad(18);
+const MAX_ELEVATION = THREE.MathUtils.degToRad(88);
+const MIN_ZOOM = 0.5; // 1 = the whole table exactly fits the screen
 
 /** fiber-native loads `require()` asset ids directly; the web needs a URL. */
 const src = (mod: number) => (Platform.OS === 'web' ? Asset.fromModule(mod).uri : mod) as string;
+
+/** Camera orbit around the board. null angles mean "the default view for this screen shape". */
+export interface OrbitView {
+  azimuth: number | null;
+  elevation: number | null;
+  zoom: number;
+  lastInteraction: number;
+  /** Angles actually on screen (default + idle sway), written by the camera rig. */
+  shownAzimuth: number;
+  shownElevation: number;
+  /** Pixels covered by UI panels at the top / bottom; the table is fitted into the space between. */
+  insetTop: number;
+  insetBottom: number;
+}
+
+export const createView = (): OrbitView => ({
+  azimuth: null,
+  elevation: null,
+  zoom: 1,
+  lastInteraction: 0,
+  shownAzimuth: 0,
+  shownElevation: 0,
+  insetTop: 0,
+  insetBottom: 0,
+});
+
+export function resetView(view: OrbitView) {
+  view.azimuth = null;
+  view.elevation = null;
+  view.zoom = 1;
+  view.lastInteraction = 0;
+}
+
+/**
+ * The sand timer is the turn clock. Bumping `turnId` flips it over; `progress`
+ * (0 → 1) is how much of the turn has passed, i.e. how much sand has fallen.
+ */
+export interface SandState {
+  turnId: number;
+  progress: number;
+}
 
 interface Props {
   teams: Team[];
@@ -31,44 +80,98 @@ interface Props {
   fromScores?: Record<string, number>;
   /** The winner's pawn celebrates. */
   winnerId?: string | null;
+  /** Drag to orbit, pinch or mouse wheel to zoom. */
+  interactive?: boolean;
+  view?: RefObject<OrbitView>;
+  sand?: RefObject<SandState>;
+  /** Bumped every time a card is drawn: a card flies up from the deck. */
+  cardsDrawn?: number;
   style?: StyleProp<ViewStyle>;
 }
 
-/** Realistic 3D Alias board: red board, raised speech-bubble squares, pawns, decks and a sand timer. */
-export function Board3D({ style, ...scene }: Props) {
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Realistic 3D Alias table: board, raised speech-bubble squares, pawns, card decks and a sand timer. */
+export function Board3D({ style, interactive = false, view: viewProp, sand: sandProp, ...scene }: Props) {
+  const ownView = useRef<OrbitView>(createView());
+  const ownSand = useRef<SandState>({ turnId: 0, progress: 1 });
+  const view = viewProp ?? ownView;
+  const sand = sandProp ?? ownSand;
+
+  const gestures = useMemo(() => {
+    let start = { az: 0, el: 0, zoom: 1 };
+    let pinch: number | null = null;
+    const touchDistance = (touches: { pageX: number; pageY: number }[]) =>
+      Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        const v = view.current!;
+        start = { az: v.shownAzimuth, el: v.shownElevation, zoom: v.zoom };
+        pinch = null;
+      },
+      onPanResponderMove: (evt, g) => {
+        const v = view.current!;
+        v.lastInteraction = Date.now();
+        const touches = evt.nativeEvent.touches as unknown as { pageX: number; pageY: number }[] | undefined;
+        if (touches && touches.length >= 2) {
+          const d = touchDistance(touches);
+          if (pinch === null) {
+            pinch = d;
+            start.zoom = v.zoom;
+          }
+          v.zoom = clamp((start.zoom * pinch) / d, MIN_ZOOM, 1);
+          return;
+        }
+        v.azimuth = start.az - g.dx * 0.008;
+        v.elevation = clamp(start.el + g.dy * 0.006, MIN_ELEVATION, MAX_ELEVATION);
+      },
+    });
+  }, [view]);
+
   return (
-    <View style={[styles.stage, style]}>
-      <Canvas shadows dpr={[1, 2]} camera={{ fov: 32, position: [0, 10, 10] }}>
+    <View style={[styles.stage, style]} {...(interactive ? gestures.panHandlers : {})}>
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        camera={{ fov: 32, position: [0, 10, 10] }}
+        onWheel={
+          interactive
+            ? (e: { deltaY: number }) => {
+                const v = view.current!;
+                v.zoom = clamp(v.zoom * (1 + e.deltaY * 0.0012), MIN_ZOOM, 1);
+                v.lastInteraction = Date.now();
+              }
+            : undefined
+        }
+      >
         <color attach="background" args={[STAGE]} />
         <Suspense fallback={null}>
-          <Scene {...scene} />
+          <Scene {...scene} view={view} sand={sand} />
         </Suspense>
       </Canvas>
     </View>
   );
 }
 
-function Scene({ teams, target, activeTeamId, fromScores, winnerId }: Omit<Props, 'style'>) {
+type SceneProps = Omit<Props, 'style' | 'interactive' | 'view' | 'sand'> & {
+  view: RefObject<OrbitView>;
+  sand: RefObject<SandState>;
+};
+
+function Scene({ teams, target, activeTeamId, fromScores, winnerId, view, sand, cardsDrawn = 0 }: SceneProps) {
   const layout = useMemo(() => computeLayout(target), [target]);
   const [discTex, logoTex, cardTex] = useLoader(THREE.TextureLoader, [src(DISCS), src(LOGO), src(CARD)]);
   for (const t of [discTex, logoTex, cardTex]) {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;
   }
-
-  // On a tall (portrait) canvas the board is turned lengthwise so it fills the screen.
-  const { size } = useThree();
-  const yaw = size.width / Math.max(1, size.height) < 0.8 ? Math.PI / 2 : 0;
-
-  const group = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    // A slow idle sway so the board feels alive.
-    if (group.current) group.current.rotation.y = yaw + Math.sin(clock.elapsedTime * 0.25) * 0.05;
-  });
+  const props = useMemo(() => propPositions(layout), [layout]);
 
   return (
     <>
-      <FitCamera layout={layout} yaw={yaw} />
+      <CameraRig layout={layout} view={view} />
       <hemisphereLight args={['#ffffff', '#5a4440', 1.3]} />
       <ambientLight intensity={0.35} />
       <directionalLight
@@ -82,64 +185,106 @@ function Scene({ teams, target, activeTeamId, fromScores, winnerId }: Omit<Props
         shadow-camera-bottom={-layout.width}
         shadow-bias={-0.0005}
       />
-      <group ref={group}>
-        <BoardBase layout={layout} logo={logoTex} />
-        <Discs layout={layout} texture={discTex} faceYaw={-yaw} />
-        <Props3D layout={layout} cardTexture={cardTex} />
-        {teams.map((t) => (
-          <Pawn
-            key={t.id}
-            team={t}
-            teams={teams}
-            layout={layout}
-            from={fromScores?.[t.id] ?? t.score}
-            active={t.id === activeTeamId}
-            celebrating={t.id === winnerId}
-          />
-        ))}
-        {/* Soft contact shadows on the "table". */}
-        <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
-          <planeGeometry args={[layout.width * 4, layout.width * 4]} />
-          <shadowMaterial opacity={0.35} />
-        </mesh>
-      </group>
+      <BoardBase layout={layout} logo={logoTex} />
+      <Discs layout={layout} texture={discTex} view={view} />
+      <Decks decks={props.decks} cardTexture={cardTex} />
+      <SandTimer position={props.timer} sand={sand} />
+      <CardFlight from={props.drawFrom} cardsDrawn={cardsDrawn} texture={cardTex} />
+      {teams.map((t) => (
+        <Pawn
+          key={t.id}
+          team={t}
+          teams={teams}
+          layout={layout}
+          from={fromScores?.[t.id] ?? t.score}
+          active={t.id === activeTeamId}
+          celebrating={t.id === winnerId}
+        />
+      ))}
+      {/* Soft contact shadows on the "table". */}
+      <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
+        <planeGeometry args={[layout.width * 4, layout.width * 4]} />
+        <shadowMaterial opacity={0.35} />
+      </mesh>
     </>
   );
 }
 
-/** Places the camera at a board-game angle and fits the whole table to the canvas. */
-function FitCamera({ layout, yaw }: { layout: BoardLayout; yaw: number }) {
+/** Bounds of everything on the table: the board plus the decks and timer behind its far edge. */
+function tableBounds(layout: BoardLayout) {
+  const halfW = layout.width / 2;
+  const far = -layout.depth / 2 - 2.8;
+  const near = layout.depth / 2;
+  const corners: THREE.Vector3[] = [];
+  for (const x of [-halfW, halfW]) for (const z of [far, near]) for (const y of [0, 2]) corners.push(new THREE.Vector3(x, y, z));
+  return { corners, center: new THREE.Vector3(0, 0.3, (far + near) / 2) };
+}
+
+/**
+ * Orbit camera: always aims at the middle of the table and, whatever the angle,
+ * backs off just enough to keep the whole table on screen (times the user's zoom).
+ * The table is fitted into the free band between the UI panels, not the whole canvas.
+ */
+function CameraRig({ layout, view }: { layout: BoardLayout; view: RefObject<OrbitView> }) {
   const { camera, size } = useThree();
-  useLayoutEffect(() => {
+  const bounds = useMemo(() => tableBounds(layout), [layout]);
+  const dist = useRef(layout.width * 2);
+  const insets = useRef({ top: 0, bottom: 0 });
+  const probe = useMemo(() => new THREE.PerspectiveCamera(), []);
+
+  useFrame(({ clock }, delta) => {
+    const v = view.current;
+    if (!v) return;
     const cam = camera as THREE.PerspectiveCamera;
-    cam.aspect = size.width / Math.max(1, size.height);
-    const elev = THREE.MathUtils.degToRad(yaw ? 62 : 50);
-    const center = new THREE.Vector3(yaw ? -0.9 : 0, 0, yaw ? 0 : -0.9);
-    // Everything that must stay in frame: the board plus the decks and timer behind it.
-    const halfW = layout.width / 2;
-    const corners: THREE.Vector3[] = [];
-    for (const x of [-halfW, halfW])
-      for (const z of [-layout.depth / 2 - 2.4, layout.depth / 2])
-        for (const y of [0, 1.6]) corners.push(new THREE.Vector3(x, y, z).applyAxisAngle(THREE.Object3D.DEFAULT_UP, yaw));
-    // Zoom in until the furthest corner touches the edge of the view.
-    let dist = layout.width * 2;
-    for (let i = 0; i < 6; i++) {
-      cam.position.set(0, center.y + Math.sin(elev) * dist, center.z + Math.cos(elev) * dist);
-      cam.lookAt(center);
-      cam.updateMatrixWorld();
-      cam.updateProjectionMatrix();
-      const reach = Math.max(
-        ...corners.map((c) => {
-          const p = c.clone().project(cam);
-          return Math.max(Math.abs(p.x), Math.abs(p.y));
-        }),
-      );
-      dist *= reach / 0.94;
+    const W = Math.max(1, size.width);
+    const H = Math.max(1, size.height);
+    const ease = Math.min(1, delta * 6);
+    insets.current.top += (clamp(v.insetTop, 0, H * 0.8) - insets.current.top) * ease;
+    insets.current.bottom += (clamp(v.insetBottom, 0, H * 0.8) - insets.current.bottom) * ease;
+    const free = Math.max(H * 0.15, H - insets.current.top - insets.current.bottom);
+    const freeCenter = insets.current.top + free / 2;
+    // Render a taller virtual image centred on the free band (see setViewOffset).
+    const virtualH = 2 * Math.max(freeCenter, H - freeCenter);
+    const portrait = W / free < 0.8;
+
+    // On a tall screen the default view looks along the board so it fills the height.
+    const defaultAz = portrait ? -Math.PI / 2 : 0;
+    const defaultEl = THREE.MathUtils.degToRad(portrait ? 62 : 50);
+    const idle = Date.now() - v.lastInteraction > 4000;
+    const az = (v.azimuth ?? defaultAz) + (idle ? Math.sin(clock.elapsedTime * 0.25) * 0.06 : 0);
+    const el = v.elevation ?? defaultEl;
+    v.shownAzimuth = v.azimuth ?? defaultAz;
+    v.shownElevation = el;
+
+    // Distance at which the table exactly fits the free band, for these angles.
+    probe.fov = cam.fov;
+    probe.aspect = W / virtualH;
+    const limitX = 0.94;
+    const limitY = 0.94 * (free / virtualH);
+    const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+    let fit = dist.current / Math.max(v.zoom, 0.01);
+    for (let i = 0; i < 4; i++) {
+      probe.position.copy(bounds.center).addScaledVector(dir, fit);
+      probe.lookAt(bounds.center);
+      probe.updateMatrixWorld();
+      probe.updateProjectionMatrix();
+      let reach = 0;
+      for (const c of bounds.corners) {
+        const p = c.clone().project(probe);
+        reach = Math.max(reach, Math.abs(p.x) / limitX, Math.abs(p.y) / limitY);
+      }
+      fit *= reach;
     }
+    dist.current += (fit * v.zoom - dist.current) * ease;
+
+    cam.aspect = W / virtualH;
+    cam.setViewOffset(W, virtualH, 0, virtualH / 2 - freeCenter, W, H);
+    cam.position.copy(bounds.center).addScaledVector(dir, dist.current);
+    cam.lookAt(bounds.center);
     cam.near = 0.1;
-    cam.far = dist * 4;
+    cam.far = dist.current * 4;
     cam.updateProjectionMatrix();
-  }, [camera, size, layout, yaw]);
+  });
   return null;
 }
 
@@ -211,8 +356,13 @@ function atlasPlane(cell: number, radius: number) {
   return g;
 }
 
-/** `faceYaw` turns the numbers so they stay upright when the whole board is rotated. */
-function Discs({ layout, texture, faceYaw }: { layout: BoardLayout; texture: THREE.Texture; faceYaw: number }) {
+/** The numbers turn with the camera so they always read upright. */
+function Discs({ layout, texture, view }: { layout: BoardLayout; texture: THREE.Texture; view: RefObject<OrbitView> }) {
+  const faces = useRef<(THREE.Mesh | null)[]>([]);
+  useFrame(() => {
+    const az = view.current?.shownAzimuth ?? 0;
+    for (const f of faces.current) if (f) f.rotation.y = az;
+  });
   const target = layout.squares.length - 1;
   const discs = useMemo(
     () =>
@@ -249,7 +399,13 @@ function Discs({ layout, texture, faceYaw }: { layout: BoardLayout; texture: THR
             <boxGeometry args={[d.radius * 0.5, DISC_HEIGHT, d.radius * 0.5]} />
             <meshStandardMaterial color="#ffffff" roughness={0.4} />
           </mesh>
-          <mesh geometry={d.face} position-y={DISC_HEIGHT + 0.002} rotation-y={faceYaw}>
+          <mesh
+            ref={(m) => {
+              faces.current[i] = m;
+            }}
+            geometry={d.face}
+            position-y={DISC_HEIGHT + 0.002}
+          >
             <meshStandardMaterial map={texture} transparent alphaTest={0.3} roughness={0.35} />
           </mesh>
         </group>
@@ -320,13 +476,13 @@ function Pawn({ team, teams, layout, from, active, celebrating }: PawnProps) {
   return (
     <group ref={ref}>
       <group scale={1.35}>
-      <mesh geometry={geometry} castShadow>
-        <meshStandardMaterial color={team.color} roughness={0.28} metalness={0.05} />
-      </mesh>
-      <mesh position-y={0.63} castShadow>
-        <sphereGeometry args={[0.13, 32, 24]} />
-        <meshStandardMaterial color={team.color} roughness={0.28} metalness={0.05} />
-      </mesh>
+        <mesh geometry={geometry} castShadow>
+          <meshStandardMaterial color={team.color} roughness={0.28} metalness={0.05} />
+        </mesh>
+        <mesh position-y={0.63} castShadow>
+          <sphereGeometry args={[0.13, 32, 24]} />
+          <meshStandardMaterial color={team.color} roughness={0.28} metalness={0.05} />
+        </mesh>
       </group>
       <mesh ref={ring} rotation-x={-Math.PI / 2} position-y={0.01}>
         <ringGeometry args={[0.4, 0.5, 40]} />
@@ -340,12 +496,12 @@ const TIMER_GLASS = [
   [0.22, 0], [0.25, 0.18], [0.2, 0.36], [0.07, 0.5], [0.2, 0.64], [0.25, 0.82], [0.22, 1.0],
 ].map(([x, y]) => new THREE.Vector2(x, y));
 
-/** Card decks and the sand timer, placed behind the far-right corner like in the box photo. */
-function Props3D({ layout, cardTexture }: { layout: BoardLayout; cardTexture: THREE.Texture }) {
-  const glass = useMemo(() => new THREE.LatheGeometry(TIMER_GLASS, 32), []);
-  const side = useMemo(() => new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.7 }), []);
-  const top = useMemo(() => new THREE.MeshStandardMaterial({ map: cardTexture, roughness: 0.45 }), [cardTexture]);
-  const deckMaterials = [side, side, top, side, side, side];
+/** Sand filling the top bulb, measured up from the neck. */
+const TOP_SAND = [
+  [0, 0], [0.05, 0], [0.175, 0.14], [0.225, 0.32], [0.2, 0.4], [0, 0.4],
+].map(([x, y]) => new THREE.Vector2(x, y));
+
+function propPositions(layout: BoardLayout) {
   const baseX = layout.width / 2 - 1.7;
   const baseZ = -layout.depth / 2 - 1.35;
   const decks: [number, number, number][] = [
@@ -354,31 +510,165 @@ function Props3D({ layout, cardTexture }: { layout: BoardLayout; cardTexture: TH
     [baseX - 0.35, baseZ + 0.75, 0.05],
     [baseX + 0.85, baseZ + 0.55, 0.22],
   ];
+  const [x, z] = decks[2];
+  return {
+    decks,
+    drawFrom: new THREE.Vector3(x, 0.42, z),
+    timer: new THREE.Vector3(baseX - 2.3, 0, baseZ + 0.1),
+  };
+}
+
+function Decks({ decks, cardTexture }: { decks: [number, number, number][]; cardTexture: THREE.Texture }) {
+  const side = useMemo(() => new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.7 }), []);
+  const top = useMemo(() => new THREE.MeshStandardMaterial({ map: cardTexture, roughness: 0.45 }), [cardTexture]);
+  const materials = [side, side, top, side, side, side];
   return (
     <>
       {decks.map(([x, z, r], i) => (
-        <mesh key={i} position={[x, 0.2, z]} rotation-y={r} material={deckMaterials} castShadow receiveShadow>
+        <mesh key={i} position={[x, 0.2, z]} rotation-y={r} material={materials} castShadow receiveShadow>
           <boxGeometry args={[0.95, 0.4, 1.33]} />
         </mesh>
       ))}
-      <group position={[baseX - 2, 0, baseZ + 0.2]} scale={1.3}>
-        <mesh position-y={0.04} castShadow>
-          <cylinderGeometry args={[0.3, 0.32, 0.08, 32]} />
-          <meshStandardMaterial color={RED} roughness={0.35} />
-        </mesh>
-        <mesh geometry={glass} position-y={0.08} castShadow>
-          <meshStandardMaterial color="#ffffff" transparent opacity={0.55} roughness={0.1} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh position-y={0.2}>
-          <coneGeometry args={[0.2, 0.22, 24]} />
-          <meshStandardMaterial color="#F3E3C3" roughness={0.9} />
-        </mesh>
-        <mesh position-y={1.12} castShadow>
-          <cylinderGeometry args={[0.32, 0.3, 0.08, 32]} />
-          <meshStandardMaterial color={RED} roughness={0.35} />
-        </mesh>
-      </group>
     </>
+  );
+}
+
+const easeInOut = (k: number) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
+
+/**
+ * Sand timer = turn clock. When a turn starts it flips over (the sand that had
+ * fallen is now on top), then the sand runs from the top bulb to the bottom.
+ */
+function SandTimer({ position, sand }: { position: THREE.Vector3; sand: RefObject<SandState> }) {
+  const pivot = useRef<THREE.Group>(null);
+  const topSand = useRef<THREE.Mesh>(null);
+  const pile = useRef<THREE.Mesh>(null);
+  const stream = useRef<THREE.Mesh>(null);
+  const turn = useRef(sand.current?.turnId ?? 0);
+  const flipStart = useRef<number | null>(null);
+
+  const glass = useMemo(() => new THREE.LatheGeometry(TIMER_GLASS, 40), []);
+  const topGeometry = useMemo(() => new THREE.LatheGeometry(TOP_SAND, 32), []);
+  const pileGeometry = useMemo(() => {
+    const g = new THREE.ConeGeometry(0.21, 0.3, 32);
+    g.translate(0, 0.15, 0);
+    return g;
+  }, []);
+
+  useFrame(({ clock }) => {
+    const s = sand.current;
+    if (!s || !pivot.current || !topSand.current || !pile.current || !stream.current) return;
+    const t = clock.elapsedTime;
+    if (s.turnId !== turn.current) {
+      turn.current = s.turnId;
+      flipStart.current = t;
+    }
+    const flipK = flipStart.current === null ? 1 : (t - flipStart.current) / (TIMER_FLIP_MS / 1000);
+    const flipping = flipK < 1;
+    let top: number;
+    let bottom: number;
+    if (flipping) {
+      // Rotate end over end, lifted off the table; the fallen sand turns with the glass.
+      const k = easeInOut(Math.max(0, flipK));
+      pivot.current.rotation.z = Math.PI * k;
+      pivot.current.position.y = 0.58 + Math.sin(k * Math.PI) * 0.5;
+      top = 0;
+      bottom = 1;
+    } else {
+      pivot.current.rotation.z = 0;
+      pivot.current.position.y = 0.58;
+      const p = s.turnId === 0 ? 1 : clamp(s.progress, 0, 1);
+      top = 1 - p;
+      bottom = p;
+    }
+    topSand.current.visible = top > 0.002;
+    topSand.current.scale.set(0.55 + 0.45 * top, Math.max(top, 0.001), 0.55 + 0.45 * top);
+    pile.current.visible = bottom > 0.002;
+    pile.current.scale.set(0.45 + 0.55 * bottom, Math.max(bottom, 0.001), 0.45 + 0.55 * bottom);
+    const running = !flipping && top > 0.002 && bottom < 0.998 && s.turnId > 0;
+    stream.current.visible = running;
+    if (running) {
+      const pileTop = 0.08 + 0.3 * bottom;
+      const len = Math.max(0.02, 0.58 - pileTop);
+      stream.current.scale.y = len;
+      stream.current.position.y = pileTop + len / 2;
+    }
+  });
+
+  return (
+    <group position={position} scale={2.2}>
+      {/* Pivot at mid-height so the flip turns the timer around its centre. */}
+      <group ref={pivot} position-y={0.58}>
+        <group position-y={-0.58}>
+          <mesh position-y={0.04} castShadow>
+            <cylinderGeometry args={[0.3, 0.32, 0.08, 32]} />
+            <meshStandardMaterial color={RED} roughness={0.35} />
+          </mesh>
+          <mesh ref={pile} geometry={pileGeometry} position-y={0.08}>
+            <meshStandardMaterial color={SAND} roughness={0.95} />
+          </mesh>
+          <mesh ref={topSand} geometry={topGeometry} position-y={0.58}>
+            <meshStandardMaterial color={SAND} roughness={0.95} />
+          </mesh>
+          <mesh ref={stream}>
+            <cylinderGeometry args={[0.018, 0.018, 1, 8]} />
+            <meshStandardMaterial color={SAND} roughness={0.95} />
+          </mesh>
+          <mesh geometry={glass} position-y={0.08} castShadow>
+            <meshStandardMaterial
+              color="#ffffff"
+              transparent
+              opacity={0.22}
+              roughness={0.05}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+          {/* Open ring on top, so from the usual high camera you can look down into the top bulb. */}
+          <mesh position-y={1.12} rotation-x={Math.PI / 2} castShadow>
+            <torusGeometry args={[0.26, 0.05, 16, 40]} />
+            <meshStandardMaterial color={RED} roughness={0.35} />
+          </mesh>
+        </group>
+      </group>
+    </group>
+  );
+}
+
+/** A card lifts off the deck and flies up towards the viewer; the readable card then appears on screen. */
+function CardFlight({ from, cardsDrawn, texture }: { from: THREE.Vector3; cardsDrawn: number; texture: THREE.Texture }) {
+  const mesh = useRef<THREE.Mesh>(null);
+  const seen = useRef(cardsDrawn);
+  const startAt = useRef<number | null>(null);
+  const { camera } = useThree();
+  const flat = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)), []);
+
+  useFrame(({ clock }) => {
+    const m = mesh.current;
+    if (!m) return;
+    const t = clock.elapsedTime;
+    if (cardsDrawn !== seen.current) {
+      seen.current = cardsDrawn;
+      startAt.current = t;
+    }
+    const k = startAt.current === null ? 1 : (t - startAt.current) / CARD_FLIGHT;
+    m.visible = k < 1;
+    if (!m.visible) return;
+    const e = 1 - (1 - k) ** 3;
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    const to = camera.position.clone().addScaledVector(dir, 3);
+    m.position.lerpVectors(from, to, e);
+    m.position.y += Math.sin(k * Math.PI) * 1.2;
+    m.quaternion.slerpQuaternions(flat, camera.quaternion, e);
+    m.rotateZ((1 - e) * 0.6);
+  });
+
+  return (
+    <mesh ref={mesh} visible={false}>
+      <planeGeometry args={[0.95, 1.33]} />
+      <meshStandardMaterial map={texture} side={THREE.DoubleSide} roughness={0.4} />
+    </mesh>
   );
 }
 

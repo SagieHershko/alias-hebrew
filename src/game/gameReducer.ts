@@ -1,4 +1,4 @@
-import { WORDS } from '../data/words';
+import { WORDS, WORDS_PER_CARD } from '../data/words';
 import { TEAM_COLORS } from '../theme';
 import type { GameAction, GameState, Settings, Team, TurnWord } from './types';
 
@@ -18,6 +18,9 @@ export const initialState: GameState = {
   currentTeamIndex: 0,
   round: 1,
   deck: [],
+  currentCard: null,
+  cardsDrawn: 0,
+  wordIndex: 0,
   currentWord: null,
   turnWords: [],
   winnerId: null,
@@ -33,16 +36,33 @@ export function shuffle<T>(items: readonly T[]): T[] {
   return copy;
 }
 
-/** Draws the next card. When the deck runs out it is reshuffled, avoiding words already seen this turn. */
-function drawWord(deck: string[], turnWords: TurnWord[]): { word: string; deck: string[] } {
-  let source = deck;
-  if (source.length === 0) {
-    const seen = new Set(turnWords.map((w) => w.word));
-    source = shuffle(WORDS.filter((w) => !seen.has(w)));
-    if (source.length === 0) source = shuffle(WORDS);
+/** Deals the word bank onto shuffled 8-word cards, leaving out words in `exclude`. */
+export function dealCards(exclude: ReadonlySet<string> = new Set()): string[][] {
+  let words = shuffle(WORDS.filter((w) => !exclude.has(w)));
+  if (words.length < WORDS_PER_CARD) words = shuffle(WORDS);
+  const cards: string[][] = [];
+  for (let i = 0; i + WORDS_PER_CARD <= words.length; i += WORDS_PER_CARD) {
+    cards.push(words.slice(i, i + WORDS_PER_CARD));
   }
-  const [word, ...rest] = source;
-  return { word, deck: rest };
+  return cards;
+}
+
+/** Draws the next card. When the deck runs out it is re-dealt, avoiding words already seen this turn. */
+function drawCard(state: GameState, turnWords: TurnWord[]) {
+  let deck = state.deck;
+  if (deck.length === 0) deck = dealCards(new Set(turnWords.map((w) => w.word)));
+  const [card, ...rest] = deck;
+  return {
+    deck: rest,
+    currentCard: card,
+    currentWord: card[state.wordIndex],
+    cardsDrawn: state.cardsDrawn + 1,
+  };
+}
+
+/** Square number 1–8 under a board position (the start square is a 1), as a 0-based word index. */
+export function wordIndexFor(score: number): number {
+  return score % WORDS_PER_CARD;
 }
 
 /**
@@ -83,21 +103,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         phase: 'scoreboard',
         settings: action.settings,
         teams,
-        deck: shuffle(WORDS),
+        deck: dealCards(),
       };
     }
 
     case 'BEGIN_TURN': {
       if (state.phase !== 'scoreboard') return state;
-      const { word, deck } = drawWord(state.deck, []);
-      return { ...state, phase: 'turn', currentWord: word, deck, turnWords: [] };
+      const wordIndex = wordIndexFor(state.teams[state.currentTeamIndex].score);
+      const next = { ...state, wordIndex };
+      return { ...next, ...drawCard(next, []), phase: 'turn', turnWords: [] };
     }
 
     case 'ANSWER': {
       if (state.phase !== 'turn' || state.currentWord === null) return state;
       const turnWords = [...state.turnWords, { word: state.currentWord, result: action.result }];
-      const { word, deck } = drawWord(state.deck, turnWords);
-      return { ...state, turnWords, currentWord: word, deck };
+      return { ...state, ...drawCard(state, turnWords), turnWords };
     }
 
     case 'LAST_WORD': {
@@ -110,13 +130,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         isLastWord: true,
         guessedBy: action.teamId,
       };
-      return { ...state, phase: 'summary', turnWords: [...state.turnWords, lastWord], currentWord: null };
+      return {
+        ...state,
+        phase: 'summary',
+        turnWords: [...state.turnWords, lastWord],
+        currentWord: null,
+        currentCard: null,
+      };
     }
 
     case 'END_TURN': {
       if (state.phase !== 'turn') return state;
       // An unanswered card on screen is simply discarded (it is not scored either way).
-      return { ...state, phase: 'summary', currentWord: null };
+      return { ...state, phase: 'summary', currentWord: null, currentCard: null };
     }
 
     case 'TOGGLE_WORD': {
@@ -183,7 +209,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         phase: 'scoreboard',
         settings: state.settings,
         teams: state.teams.map((t) => ({ ...t, score: 0 })),
-        deck: shuffle(WORDS),
+        deck: dealCards(),
       };
 
     case 'BACK_TO_SETUP':

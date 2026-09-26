@@ -34,8 +34,14 @@ export interface GameState {
   teams: Team[];
   currentTeamIndex: number;
   round: number;
-  /** Shuffled words not yet shown in this game. */
-  deck: string[];
+  /** Shuffled 8-word cards not yet drawn in this game. */
+  deck: string[][];
+  /** The card on screen, and how many cards were drawn (animation key). */
+  currentCard: string[] | null;
+  cardsDrawn: number;
+  /** Which word on each card (0–7) the team explains: the number of its square. */
+  wordIndex: number;
+  /** The word to explain: currentCard[wordIndex]. */
   currentWord: string | null;
   turnWords: TurnWord[];
   winnerId: string | null;

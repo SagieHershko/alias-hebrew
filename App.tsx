@@ -3,32 +3,17 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { GameProvider, useGame } from './src/game/GameContext';
-import { GameScreen } from './src/screens/GameScreen';
-import { ScoreboardScreen } from './src/screens/ScoreboardScreen';
 import { SetupScreen } from './src/screens/SetupScreen';
-import { TurnSummaryScreen } from './src/screens/TurnSummaryScreen';
-import { WinnerScreen } from './src/screens/WinnerScreen';
+import { GameStage } from './src/screens/stage/GameStage';
 import { colors } from './src/theme';
 
 /**
- * The game is a linear state machine (setup → scoreboard → turn → summary → …),
- * so the current phase in the game state decides which screen is shown.
- * A fresh <GameScreen> is mounted for every turn, which resets its timer.
+ * Setup is a regular form; everything after it happens on one full-screen 3D
+ * table (GameStage), which swaps panels per phase: board → turn → summary → …
  */
 function CurrentScreen() {
   const { state } = useGame();
-  switch (state.phase) {
-    case 'setup':
-      return <SetupScreen />;
-    case 'scoreboard':
-      return <ScoreboardScreen />;
-    case 'turn':
-      return <GameScreen />;
-    case 'summary':
-      return <TurnSummaryScreen />;
-    case 'winner':
-      return <WinnerScreen />;
-  }
+  return state.phase === 'setup' ? <SetupScreen /> : <GameStage />;
 }
 
 export default function App() {
