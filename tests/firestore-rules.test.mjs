@@ -47,6 +47,10 @@ await t('bob picks team 1', assertSucceeds(updateDoc(ref(db('bob')), { 'players.
 
 console.log('Settings (host only)');
 await wait(150);
+await t('a player recolours a pawn', assertSucceeds(updateDoc(ref(db('bob')), { teamColors: ['#EC407A', '#1E63D6'], updatedAt: serverTimestamp() })));
+await wait(150);
+await t('unknown pawn colour is rejected', assertFails(updateDoc(ref(db('bob')), { teamColors: ['#123456', '#1E63D6'], updatedAt: serverTimestamp() })));
+await t('stranger cannot recolour', assertFails(updateDoc(ref(db('eve')), { teamColors: ['#FAFAFA', '#1E63D6'], updatedAt: serverTimestamp() })));
 await t('non-host cannot change settings', assertFails(updateDoc(ref(db('bob')), { settings: { ...settings, targetScore: 50 }, updatedAt: serverTimestamp() })));
 await t('host changes settings', assertSucceeds(updateDoc(ref(db('host')), { settings: { ...settings, targetScore: 50 }, updatedAt: serverTimestamp() })));
 await wait(150);

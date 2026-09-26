@@ -119,3 +119,41 @@ writeWav(
     0.6,
   );
 }
+
+// ניצחון: a brass-like fanfare (C–E–G–C, then a held major chord) over a crowd cheer.
+{
+  const brass = (t, f) => {
+    let s = 0;
+    for (let h = 1; h <= 6; h++) s += Math.sin(TAU * f * h * t + 0.3 * Math.sin(TAU * 5.5 * t)) / h;
+    return s;
+  };
+  const notes = [
+    [0.0, 523.25, 0.16],
+    [0.18, 659.25, 0.16],
+    [0.36, 783.99, 0.16],
+    [0.54, 1046.5, 0.3],
+    [0.9, 783.99, 0.14],
+    [1.06, 1046.5, 1.6],
+  ];
+  const chord = [523.25, 659.25, 783.99];
+  let cheer = 0;
+  writeWav(
+    'win.wav',
+    render(3.2, (t) => {
+      let s = 0;
+      for (const [start, f, len] of notes) {
+        const u = t - start;
+        if (u < 0 || u > len + 0.4) continue;
+        const e = Math.min(1, u / 0.02) * (u < len ? 1 : Math.exp(-(u - len) / 0.12));
+        s += brass(u, f) * e;
+      }
+      const u = t - 1.06; // the held chord under the last note
+      if (u > 0) s += 0.45 * chord.reduce((a, f) => a + brass(u, f), 0) * Math.min(1, u / 0.05) * Math.exp(-u / 1.1);
+      // Crowd: filtered noise swelling in and fading out.
+      cheer = 0.92 * cheer + 0.08 * noise();
+      const crowd = cheer * Math.min(1, t / 0.6) * Math.exp(-Math.max(0, t - 1.4) / 0.9);
+      return 0.55 * s + 2.2 * crowd;
+    }),
+    0.85,
+  );
+}

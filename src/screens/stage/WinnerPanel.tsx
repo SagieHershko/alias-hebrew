@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
 import { useGame } from '../../game/GameContext';
+import { playSound } from '../../sound/sounds';
 import { colors } from '../../theme';
 import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
@@ -14,6 +16,11 @@ export function WinnerPanel() {
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: false, bottom: true });
   const winner = state.teams.find((t) => t.id === state.winnerId);
+
+  // Fanfare and cheers once, when the winner is announced.
+  useEffect(() => {
+    if (state.winnerId) playSound('win');
+  }, [state.winnerId]);
 
   return (
     <View style={panel.layer} pointerEvents="box-none">

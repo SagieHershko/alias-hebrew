@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { DEFAULT_SETTINGS, gameReducer, initialState, MAX_TEAMS, MIN_TEAMS } from '../game/gameReducer';
 import type { GameAction, GameState, Player, Settings } from '../game/types';
+import { teamColors } from '../theme';
 import { playerFromUser } from './auth';
 import { firebase } from './firebase';
 import { setServerOffset } from './serverTime';
@@ -34,6 +35,8 @@ export interface Room {
   createdAt: number;
   players: Record<string, RoomPlayer>;
   teamNames: string[];
+  /** Pawn colour per team (missing in older rooms: the defaults). */
+  teamColors?: string[];
   settings: Settings;
   game: string | null;
   rev: number;
@@ -120,6 +123,7 @@ export async function createRoom(user: User): Promise<string> {
           createdAt: Date.now(),
           players: { [user.uid]: roomPlayer(user, 0) },
           teamNames: DEFAULT_TEAM_NAMES.slice(0, 2),
+          teamColors: teamColors(2),
           settings: DEFAULT_SETTINGS,
           game: null,
           rev: 0,
@@ -161,8 +165,30 @@ export function leaveLobby(code: string, uid: string) {
   return withRetry(() => updateDoc(roomRef(code), { [`players.${uid}`]: deleteField() }));
 }
 
-/** Host: rename teams, add / remove a team, change the settings. */
-export async function updateLobby(code: string, patch: { teamNames?: string[]; settings?: Settings }) {
+/** The room's pawn colour for each team. */
+export function roomColors(room: Room): string[] {
+  return teamColors(room.teamNames.length, room.teamColors);
+}
+
+/** Any player in the room: change a team's pawn colour (to one no other team has). */
+export async function setTeamColor(code: string, index: number, color: string) {
+  await withRetry(() =>
+    runTransaction(firebase().db, async (tx) => {
+      const snap = await tx.get(roomRef(code));
+      if (!snap.exists()) return;
+      const current = roomColors(snap.data() as Room);
+      if (current.some((c, i) => i !== index && c === color)) return;
+      current[index] = color;
+      tx.update(roomRef(code), { teamColors: current, updatedAt: serverTimestamp() });
+    }),
+  );
+}
+
+/** Host: rename teams, add / remove a team (with its colour), change the settings. */
+export async function updateLobby(
+  code: string,
+  patch: { teamNames?: string[]; teamColors?: string[]; settings?: Settings },
+) {
   await withRetry(() =>
     runTransaction(firebase().db, async (tx) => {
       const snap = await tx.get(roomRef(code));
@@ -172,6 +198,7 @@ export async function updateLobby(code: string, patch: { teamNames?: string[]; s
       if (patch.teamNames) {
         const count = Math.min(MAX_TEAMS, Math.max(MIN_TEAMS, patch.teamNames.length));
         update.teamNames = patch.teamNames.slice(0, count);
+        update.teamColors = teamColors(count, patch.teamColors ?? room.teamColors);
         // Players of a removed team go back to "no team".
         for (const [uid, p] of Object.entries(room.players)) {
           if (p.teamIndex !== null && p.teamIndex >= count) update[`players.${uid}.teamIndex`] = null;
@@ -212,6 +239,7 @@ export async function startGame(code: string) {
       const game = gameReducer(initialState, {
         type: 'START_GAME',
         teamNames: room.teamNames,
+        teamColors: roomColors(room),
         settings: room.settings,
         teamPlayers: teamPlayersOf(room),
       });

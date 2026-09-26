@@ -1,5 +1,5 @@
 import { WORDS, WORDS_PER_CARD } from '../data/words';
-import { TEAM_COLORS } from '../theme';
+import { teamColors } from '../theme';
 import { crossesStealSquare, generateStealSquares } from './board';
 import type { GameAction, GameState, Player, Settings, Team, TurnClock, TurnWord } from './types';
 
@@ -131,10 +131,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'START_GAME': {
       const names = action.teamNames.map((n) => n.trim()).slice(0, MAX_TEAMS);
       if (names.length < MIN_TEAMS || names.some((n) => n.length === 0)) return state;
+      const palette = teamColors(names.length, action.teamColors);
       const teams: Team[] = names.map((name, i) => ({
         id: `team-${i}`,
         name,
-        color: TEAM_COLORS[i % TEAM_COLORS.length],
+        color: palette[i],
         score: 0,
         turnsPlayed: 0,
         ...(action.teamPlayers ? { players: action.teamPlayers[i] ?? [] } : {}),

@@ -7,19 +7,22 @@ import { Avatar } from '../../components/Avatar';
 import { BigButton } from '../../components/BigButton';
 import { Chips, SECONDS_OPTIONS, TARGET_OPTIONS } from '../../components/Chips';
 import { InviteQR } from '../../components/InviteQR';
+import { PawnDot, PawnPalette } from '../../components/PawnColorPicker';
 import { MAX_TEAMS, MIN_TEAMS } from '../../game/gameReducer';
 import {
   canStart,
   chooseTeam,
   inviteUrl,
   leaveLobby,
+  roomColors,
+  setTeamColor,
   startGame,
   suggestTeamName,
   teamPlayersOf,
   updateLobby,
   type Room,
 } from '../../online/rooms';
-import { colors, radius, TEAM_COLORS } from '../../theme';
+import { colors, radius } from '../../theme';
 
 /** Before the game: share the invite, everyone picks a team, the host sets up and starts. */
 export function LobbyScreen({ room, user, onLeave }: { room: Room; user: User; onLeave: () => void }) {
@@ -95,7 +98,12 @@ export function LobbyScreen({ room, user, onLeave }: { room: Room; user: User; o
         <BigButton
           label="+ הוספת קבוצה"
           variant="light"
-          onPress={() => updateLobby(room.code, { teamNames: [...room.teamNames, suggestTeamName(room.teamNames)] })}
+          onPress={() =>
+            updateLobby(room.code, {
+              teamNames: [...room.teamNames, suggestTeamName(room.teamNames)],
+              teamColors: roomColors(room),
+            })
+          }
         />
       )}
       {unassigned.length > 0 && (
@@ -183,12 +191,23 @@ function TeamCard({ room, index, players, editable, mine, onJoin }: TeamCardProp
     if (!trimmed || trimmed === room.teamNames[index]) return setName(room.teamNames[index]);
     updateLobby(room.code, { teamNames: room.teamNames.map((n, i) => (i === index ? trimmed : n)) });
   };
-  const remove = () => updateLobby(room.code, { teamNames: room.teamNames.filter((_, i) => i !== index) });
+  const pawnColors = roomColors(room);
+  const [colorOpen, setColorOpen] = useState(false);
+  const remove = () =>
+    updateLobby(room.code, {
+      teamNames: room.teamNames.filter((_, i) => i !== index),
+      teamColors: pawnColors.filter((_, i) => i !== index),
+    });
 
   return (
     <View style={[styles.card, mine && styles.cardMine]}>
       <View style={styles.row}>
-        <View style={[styles.pawn, { backgroundColor: TEAM_COLORS[index] }]} />
+        <PawnDot
+          color={pawnColors[index]}
+          open={colorOpen}
+          onPress={() => setColorOpen((v) => !v)}
+          teamLabel={room.teamNames[index]}
+        />
         {editable ? (
           <TextInput
             value={name}
@@ -208,6 +227,16 @@ function TeamCard({ room, index, players, editable, mine, onJoin }: TeamCardProp
           </Pressable>
         )}
       </View>
+      {colorOpen && (
+        <PawnPalette
+          color={pawnColors[index]}
+          taken={pawnColors}
+          onPick={(c) => {
+            setColorOpen(false);
+            setTeamColor(room.code, index, c).catch(() => {});
+          }}
+        />
+      )}
       <View style={styles.wrap}>
         {players.length === 0 && <Text style={styles.empty}>עוד אין שחקנים</Text>}
         {players.map((p, order) => (
@@ -252,7 +281,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     writingDirection: 'ltr',
   },
-  pawn: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.white },
   teamName: { fontSize: 20, fontWeight: '900', color: colors.ink },
   teamInput: {
     backgroundColor: colors.offWhite,

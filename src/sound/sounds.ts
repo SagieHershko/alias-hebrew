@@ -10,6 +10,7 @@ const SOURCES = {
   tock: require('../../assets/sounds/tock.wav'),
   timeup: require('../../assets/sounds/timeup.wav'),
   flip: require('../../assets/sounds/flip.wav'),
+  win: require('../../assets/sounds/win.wav'),
 } as const;
 
 export type SoundName = keyof typeof SOURCES;

@@ -20,7 +20,8 @@ import { Chips, SECONDS_OPTIONS, TARGET_OPTIONS } from '../components/Chips';
 import { MAX_TEAMS, MIN_TEAMS } from '../game/gameReducer';
 import { useGame } from '../game/GameContext';
 import type { Team } from '../game/types';
-import { colors, radius, TEAM_COLORS } from '../theme';
+import { PawnDot, PawnPalette } from '../components/PawnColorPicker';
+import { colors, radius, teamColors } from '../theme';
 
 const SUGGESTED_NAMES = ['האריות', 'הנשרים', 'הכרישים', 'הנמרים', 'הדובים', 'הזאבים'];
 
@@ -41,6 +42,9 @@ export function SetupScreen({ onBack }: { onBack?: () => void }) {
   const [names, setNames] = useState<string[]>(() =>
     state.teams.length >= MIN_TEAMS ? state.teams.map((t) => t.name) : SUGGESTED_NAMES.slice(0, 2),
   );
+  const [picked, setPicked] = useState<string[]>(() => state.teams.map((t) => t.color));
+  const pawnColors = useMemo(() => teamColors(names.length, picked), [names.length, picked]);
+  const [colorOpen, setColorOpen] = useState<number | null>(null);
   const [target, setTarget] = useState(state.settings.targetScore);
   const [seconds, setSeconds] = useState(state.settings.turnSeconds);
   const [skipPenalty, setSkipPenalty] = useState(state.settings.skipPenalty);
@@ -55,17 +59,20 @@ export function SetupScreen({ onBack }: { onBack?: () => void }) {
     if (names.length >= MAX_TEAMS) return;
     const unused = SUGGESTED_NAMES.find((s) => !names.includes(s)) ?? `קבוצה ${names.length + 1}`;
     setNames([...names, unused]);
+    setPicked(pawnColors);
   };
   const removeTeam = (index: number) => {
     if (names.length <= MIN_TEAMS) return;
     setNames(names.filter((_, i) => i !== index));
+    setPicked(pawnColors.filter((_, i) => i !== index));
+    setColorOpen(null);
   };
   const rename = (index: number, value: string) => setNames(names.map((n, i) => (i === index ? value : n)));
 
   // Live preview: one pawn per team waiting on the start square.
   const previewTeams: Team[] = useMemo(
-    () => names.map((name, i) => ({ id: `preview-${i}`, name, color: TEAM_COLORS[i], score: 0 })),
-    [names],
+    () => names.map((name, i) => ({ id: `preview-${i}`, name, color: pawnColors[i], score: 0 })),
+    [names, pawnColors],
   );
 
   // A sample of steal squares for the preview; the real game draws its own at random.
@@ -75,6 +82,7 @@ export function SetupScreen({ onBack }: { onBack?: () => void }) {
     dispatch({
       type: 'START_GAME',
       teamNames: trimmed,
+      teamColors: pawnColors,
       settings: { targetScore: target, turnSeconds: seconds, skipPenalty },
     });
 
@@ -107,30 +115,47 @@ export function SetupScreen({ onBack }: { onBack?: () => void }) {
             הקבוצות ({names.length}/{MAX_TEAMS})
           </Text>
           {names.map((name, i) => (
-            <View key={i} style={styles.teamRow}>
-              <View style={[styles.pawn, { backgroundColor: TEAM_COLORS[i] }]} />
-              <TextInput
-                value={name}
-                onChangeText={(v) => rename(i, v)}
-                placeholder={`שם קבוצה ${i + 1}`}
-                placeholderTextColor={colors.muted}
-                style={styles.input}
-                maxLength={18}
-                returnKeyType="done"
-                accessibilityLabel={`שם קבוצה ${i + 1}`}
-              />
-              <Pressable
-                onPress={() => removeTeam(i)}
-                disabled={names.length <= MIN_TEAMS}
-                style={({ pressed }) => [
-                  styles.removeBtn,
-                  { opacity: names.length <= MIN_TEAMS ? 0.25 : pressed ? 0.6 : 1 },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`הסרת ${name || `קבוצה ${i + 1}`}`}
-              >
-                <Text style={styles.removeText}>✕</Text>
-              </Pressable>
+            <View key={i} style={styles.team}>
+              <View style={styles.teamRow}>
+                <PawnDot
+                  color={pawnColors[i]}
+                  open={colorOpen === i}
+                  onPress={() => setColorOpen(colorOpen === i ? null : i)}
+                  teamLabel={name || `קבוצה ${i + 1}`}
+                />
+                <TextInput
+                  value={name}
+                  onChangeText={(v) => rename(i, v)}
+                  placeholder={`שם קבוצה ${i + 1}`}
+                  placeholderTextColor={colors.muted}
+                  style={styles.input}
+                  maxLength={18}
+                  returnKeyType="done"
+                  accessibilityLabel={`שם קבוצה ${i + 1}`}
+                />
+                <Pressable
+                  onPress={() => removeTeam(i)}
+                  disabled={names.length <= MIN_TEAMS}
+                  style={({ pressed }) => [
+                    styles.removeBtn,
+                    { opacity: names.length <= MIN_TEAMS ? 0.25 : pressed ? 0.6 : 1 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`הסרת ${name || `קבוצה ${i + 1}`}`}
+                >
+                  <Text style={styles.removeText}>✕</Text>
+                </Pressable>
+              </View>
+              {colorOpen === i && (
+                <PawnPalette
+                  color={pawnColors[i]}
+                  taken={pawnColors}
+                  onPick={(c) => {
+                    setPicked(pawnColors.map((old, j) => (j === i ? c : old)));
+                    setColorOpen(null);
+                  }}
+                />
+              )}
             </View>
           ))}
           {hasDuplicates && <Text style={styles.error}>לכל קבוצה צריך שם אחר</Text>}
@@ -196,19 +221,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cardTitle: { fontSize: 22, fontWeight: '900', color: colors.red },
+  team: { gap: 8 },
   teamRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pawn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: colors.white,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
   input: {
     flex: 1,
     fontSize: 18,

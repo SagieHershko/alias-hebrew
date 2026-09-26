@@ -7,7 +7,8 @@ rules_version = '2';
 // - Only signed-in (Google) users. Rooms are private: you can open a room only if you
 //   know its code (from the invite link); listing / scanning rooms is not allowed.
 // - A player may only add / change / remove their own entry (join, pick a team, leave).
-// - Only room members may change the game; only the host may change the room settings.
+// - Only room members may change the game (or the pawn colours); only the host may change
+//   the room settings.
 // - Every write is validated (field types and sizes, at most 20 players, 2–6 teams).
 // - Rate limit: a room accepts at most one game / settings change every 100 ms.
 // - Rooms expire: expiresAt is set once, at creation. After it, the room can no longer be
@@ -42,11 +43,14 @@ service cloud.firestore {
       }
       function validRoom(d) {
         return d.keys().hasOnly(['code', 'hostUid', 'status', 'createdAt', 'updatedAt', 'players',
-                                 'teamNames', 'settings', 'game', 'rev', 'expiresAt'])
+                                 'teamNames', 'teamColors', 'settings', 'game', 'rev', 'expiresAt'])
           && d.code == code
           && d.status in ['lobby', 'playing']
           && d.players is map && d.players.size() <= 20
           && d.teamNames is list && d.teamNames.size() >= 2 && d.teamNames.size() <= 6
+          && (!('teamColors' in d) || (d.teamColors is list && d.teamColors.size() <= 6
+              && d.teamColors.hasOnly(['#FFC107', '#1E63D6', '#1FA84F', '#212121', '#8E24AA', '#FF7A00',
+                                       '#EC407A', '#00ACC1', '#795548', '#FAFAFA'])))
           && validSettings(d.settings)
           && (d.game == null || (d.game is string && d.game.size() < 300000))
           && d.rev is int;
@@ -81,6 +85,9 @@ service cloud.firestore {
         onlyMyPlayerEntry()
         || (isMember() && changed().hasOnly(['game', 'rev', 'updatedAt'])
             && after().rev == before().rev + 1 && stamped() && notTooFast())
+        // Any player may recolour the pawns in the lobby.
+        || (isMember() && before().status == 'lobby' && changed().hasOnly(['teamColors', 'updatedAt'])
+            && stamped() && notTooFast())
         || (isHost() && !changed().hasAny(['hostUid', 'code', 'createdAt', 'expiresAt'])
             && stamped() && notTooFast())
       );

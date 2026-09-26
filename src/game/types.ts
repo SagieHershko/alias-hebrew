@@ -83,7 +83,7 @@ export interface GameState {
 }
 
 export type GameAction =
-  | { type: 'START_GAME'; teamNames: string[]; settings: Settings; teamPlayers?: Player[][] }
+  | { type: 'START_GAME'; teamNames: string[]; teamColors?: string[]; settings: Settings; teamPlayers?: Player[][] }
   | { type: 'BEGIN_TURN'; now: number }
   | { type: 'PAUSE'; now: number }
   | { type: 'RESUME'; now: number }

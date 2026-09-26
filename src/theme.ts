@@ -25,11 +25,34 @@ export const TEAM_COLORS = [
   '#FF7A00', // כתום
 ] as const;
 
+/** Every pawn colour a team can pick (the first six are the defaults, in order). */
+export const PAWN_COLORS = [
+  ...TEAM_COLORS,
+  '#EC407A', // ורוד
+  '#00ACC1', // טורקיז
+  '#795548', // חום
+  '#FAFAFA', // לבן
+] as const;
+
+/**
+ * One colour per team: each team's pick when it is a known, unused colour, otherwise
+ * the first default no other team has.
+ */
+export function teamColors(count: number, picked: readonly (string | null | undefined)[] = []): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const want = picked[i];
+    const ok = want && (PAWN_COLORS as readonly string[]).includes(want) && !result.includes(want);
+    result.push(ok ? want : (PAWN_COLORS.find((c) => !result.includes(c) && !picked.slice(i + 1).includes(c)) ?? PAWN_COLORS[i]));
+  }
+  return result;
+}
+
 /**
  * Right-to-left mark. Put it before text that starts with a name, so a Latin name
  * (e.g. a Google account name) doesn't flip the Hebrew line to left-to-right.
  */
-export const RLM = '‏';
+export const RLM = '\u200F';
 
 export const TEAM_COLOR_NAMES = ['צהוב', 'כחול', 'ירוק', 'שחור', 'סגול', 'כתום'] as const;
 
