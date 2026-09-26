@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -21,6 +20,7 @@ import { MAX_TEAMS, MIN_TEAMS } from '../game/gameReducer';
 import { useGame } from '../game/GameContext';
 import type { Team } from '../game/types';
 import { PawnDot, PawnPalette } from '../components/PawnColorPicker';
+import { Toggle } from '../components/Toggle';
 import { colors, radius, teamColors } from '../theme';
 
 const SUGGESTED_NAMES = ['האריות', 'הנשרים', 'הכרישים', 'הנמרים', 'הדובים', 'הזאבים'];
@@ -172,12 +172,7 @@ export function SetupScreen({ onBack }: { onBack?: () => void }) {
           <Chips options={SECONDS_OPTIONS} value={seconds} onChange={setSeconds} />
           <View style={styles.switchRow}>
             <Text style={[styles.label, styles.flex]}>דילוג מוריד צעד אחורה</Text>
-            <Switch
-              value={skipPenalty}
-              onValueChange={setSkipPenalty}
-              trackColor={{ true: colors.red, false: '#ccc' }}
-              thumbColor={colors.white}
-            />
+            <Toggle value={skipPenalty} onValueChange={setSkipPenalty} label="דילוג מוריד צעד אחורה" />
           </View>
         </View>
 

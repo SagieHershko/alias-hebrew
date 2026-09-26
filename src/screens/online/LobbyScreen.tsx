@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../components/Avatar';
@@ -8,6 +8,7 @@ import { BigButton } from '../../components/BigButton';
 import { Chips, SECONDS_OPTIONS, TARGET_OPTIONS } from '../../components/Chips';
 import { InviteQR } from '../../components/InviteQR';
 import { PawnDot, PawnPalette } from '../../components/PawnColorPicker';
+import { Toggle } from '../../components/Toggle';
 import { MAX_TEAMS, MIN_TEAMS } from '../../game/gameReducer';
 import {
   canStart,
@@ -139,12 +140,11 @@ export function LobbyScreen({ room, user, onLeave }: { room: Room; user: User; o
         />
         <View style={styles.row}>
           <Text style={[styles.label, styles.flex]}>דילוג מוריד צעד אחורה</Text>
-          <Switch
+          <Toggle
             value={room.settings.skipPenalty}
             disabled={!isHost}
             onValueChange={(v) => updateLobby(room.code, { settings: { ...room.settings, skipPenalty: v } })}
-            trackColor={{ true: colors.red, false: '#ccc' }}
-            thumbColor={colors.white}
+            label="דילוג מוריד צעד אחורה"
           />
         </View>
       </View>
