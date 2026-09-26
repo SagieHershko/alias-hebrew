@@ -65,12 +65,32 @@ const cardHtml = `<html><head><meta charset="utf-8"><style>
   <span style="background:#1FA84F"></span><span style="background:#8E24AA"></span><span style="background:#FF7A00"></span></div>
 </div></body></html>`;
 
+// Warm wooden floor planks (tiles seamlessly), for the living room around the table.
+function floorHtml() {
+  const rows = [];
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let r = 0; r < 8; r++) {
+    const planks = [];
+    let x = -rnd() * 300;
+    while (x < 1024) {
+      const w = 260 + rnd() * 240;
+      const l = 52 + rnd() * 10;
+      planks.push(`<div style="position:absolute;left:${x}px;width:${w}px;top:0;bottom:0;background:linear-gradient(90deg,hsl(28,48%,${l}%),hsl(28,46%,${l - 4}%) 60%,hsl(28,48%,${l - 1}%));border-right:3px solid rgba(70,40,20,.35)"></div>`);
+      x += w;
+    }
+    rows.push(`<div style="position:absolute;left:0;right:0;top:${r * 128}px;height:125px;overflow:hidden;border-bottom:3px solid rgba(70,40,20,.35)">${planks.join('')}</div>`);
+  }
+  return `<html><body style="margin:0"><div id="floor" style="position:relative;width:1024px;height:1024px;overflow:hidden;background:#b98150">${rows.join('')}</div></body></html>`;
+}
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ deviceScaleFactor: 1 });
 for (const [html, sel, file] of [
   [atlasHtml(), '#atlas', 'discs.png'],
   [logoHtml, '#logo', 'logo.png'],
   [cardHtml, '#card', 'card.png'],
+  [floorHtml(), '#floor', 'floor.png'],
 ]) {
   await page.setContent(html);
   await page.waitForTimeout(200);

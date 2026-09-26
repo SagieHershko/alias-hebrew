@@ -6,13 +6,15 @@ import * as THREE from 'three';
 
 import type { Team } from '../game/types';
 import { computeLayout, type BoardLayout } from './boardLayout';
+import { LivingRoom } from './LivingRoom';
 
 const DISCS = require('../../assets/3d/discs.png');
 const LOGO = require('../../assets/3d/logo.png');
 const CARD = require('../../assets/3d/card.png');
+const FLOOR = require('../../assets/3d/floor.png');
 
 const RED = '#E30613';
-const STAGE = '#2A2C31';
+const STAGE = '#CBC5A9'; // backdrop around the living room, like the reference render
 const SAND = '#E2A93B';
 const DISC_RADIUS = 0.36;
 const DISC_HEIGHT = 0.07;
@@ -27,6 +29,11 @@ const CARD_FLIGHT = 0.5; // seconds for a card to fly from the deck to the camer
 const MIN_ELEVATION = THREE.MathUtils.degToRad(18);
 const MAX_ELEVATION = THREE.MathUtils.degToRad(88);
 const MIN_ZOOM = 0.5; // 1 = the whole table exactly fits the screen
+const MAX_ZOOM = 2.8; // zoomed out: the whole living room
+// Starting zoom: on a wide screen the living room shows around the table; on a tall phone screen
+// the board stays big enough to read.
+const DEFAULT_ZOOM_WIDE = 1.75;
+const DEFAULT_ZOOM_TALL = 1.1;
 
 /** fiber-native loads `require()` asset ids directly; the web needs a URL. */
 const src = (mod: number) => (Platform.OS === 'web' ? Asset.fromModule(mod).uri : mod) as string;
@@ -35,11 +42,12 @@ const src = (mod: number) => (Platform.OS === 'web' ? Asset.fromModule(mod).uri 
 export interface OrbitView {
   azimuth: number | null;
   elevation: number | null;
-  zoom: number;
+  zoom: number | null;
   lastInteraction: number;
   /** Angles actually on screen (default + idle sway), written by the camera rig. */
   shownAzimuth: number;
   shownElevation: number;
+  shownZoom: number;
   /** Pixels covered by UI panels at the top / bottom; the table is fitted into the space between. */
   insetTop: number;
   insetBottom: number;
@@ -48,10 +56,11 @@ export interface OrbitView {
 export const createView = (): OrbitView => ({
   azimuth: null,
   elevation: null,
-  zoom: 1,
+  zoom: null,
   lastInteraction: 0,
   shownAzimuth: 0,
   shownElevation: 0,
+  shownZoom: 1,
   insetTop: 0,
   insetBottom: 0,
 });
@@ -59,7 +68,7 @@ export const createView = (): OrbitView => ({
 export function resetView(view: OrbitView) {
   view.azimuth = null;
   view.elevation = null;
-  view.zoom = 1;
+  view.zoom = null;
   view.lastInteraction = 0;
 }
 
@@ -108,7 +117,7 @@ export function Board3D({ style, interactive = false, view: viewProp, sand: sand
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         const v = view.current!;
-        start = { az: v.shownAzimuth, el: v.shownElevation, zoom: v.zoom };
+        start = { az: v.shownAzimuth, el: v.shownElevation, zoom: v.shownZoom };
         pinch = null;
       },
       onPanResponderMove: (evt, g) => {
@@ -119,9 +128,9 @@ export function Board3D({ style, interactive = false, view: viewProp, sand: sand
           const d = touchDistance(touches);
           if (pinch === null) {
             pinch = d;
-            start.zoom = v.zoom;
+            start.zoom = v.shownZoom;
           }
-          v.zoom = clamp((start.zoom * pinch) / d, MIN_ZOOM, 1);
+          v.zoom = clamp((start.zoom * pinch) / d, MIN_ZOOM, MAX_ZOOM);
           return;
         }
         v.azimuth = start.az - g.dx * 0.008;
@@ -140,7 +149,7 @@ export function Board3D({ style, interactive = false, view: viewProp, sand: sand
           interactive
             ? (e: { deltaY: number }) => {
                 const v = view.current!;
-                v.zoom = clamp(v.zoom * (1 + e.deltaY * 0.0012), MIN_ZOOM, 1);
+                v.zoom = clamp(v.shownZoom * (1 + e.deltaY * 0.0012), MIN_ZOOM, MAX_ZOOM);
                 v.lastInteraction = Date.now();
               }
             : undefined
@@ -162,8 +171,13 @@ type SceneProps = Omit<Props, 'style' | 'interactive' | 'view' | 'sand'> & {
 
 function Scene({ teams, target, activeTeamId, fromScores, winnerId, view, sand, cardsDrawn = 0 }: SceneProps) {
   const layout = useMemo(() => computeLayout(target), [target]);
-  const [discTex, logoTex, cardTex] = useLoader(THREE.TextureLoader, [src(DISCS), src(LOGO), src(CARD)]);
-  for (const t of [discTex, logoTex, cardTex]) {
+  const [discTex, logoTex, cardTex, floorTex] = useLoader(THREE.TextureLoader, [
+    src(DISCS),
+    src(LOGO),
+    src(CARD),
+    src(FLOOR),
+  ]);
+  for (const t of [discTex, logoTex, cardTex, floorTex]) {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;
   }
@@ -172,8 +186,14 @@ function Scene({ teams, target, activeTeamId, fromScores, winnerId, view, sand, 
   return (
     <>
       <CameraRig layout={layout} view={view} />
-      <hemisphereLight args={['#ffffff', '#5a4440', 1.3]} />
+      <hemisphereLight args={['#fff7ea', '#8a6a50', 1.25]} />
       <ambientLight intensity={0.35} />
+      {/* Soft daylight from the window side. */}
+      <directionalLight
+        position={[-layout.width * 3, layout.width * 2, layout.width]}
+        intensity={0.6}
+        color="#EAF3FF"
+      />
       <directionalLight
         position={[-layout.width * 0.4, layout.width, layout.depth * 0.6]}
         intensity={2.2}
@@ -185,6 +205,7 @@ function Scene({ teams, target, activeTeamId, fromScores, winnerId, view, sand, 
         shadow-camera-bottom={-layout.width}
         shadow-bias={-0.0005}
       />
+      <LivingRoom layout={layout} floorTexture={floorTex} />
       <BoardBase layout={layout} logo={logoTex} />
       <Discs layout={layout} texture={discTex} view={view} />
       <Decks decks={props.decks} cardTexture={cardTex} />
@@ -201,11 +222,6 @@ function Scene({ teams, target, activeTeamId, fromScores, winnerId, view, sand, 
           celebrating={t.id === winnerId}
         />
       ))}
-      {/* Soft contact shadows on the "table". */}
-      <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
-        <planeGeometry args={[layout.width * 4, layout.width * 4]} />
-        <shadowMaterial opacity={0.35} />
-      </mesh>
     </>
   );
 }
@@ -216,7 +232,8 @@ function tableBounds(layout: BoardLayout) {
   const far = -layout.depth / 2 - 2.8;
   const near = layout.depth / 2;
   const corners: THREE.Vector3[] = [];
-  for (const x of [-halfW, halfW]) for (const z of [far, near]) for (const y of [0, 2]) corners.push(new THREE.Vector3(x, y, z));
+  for (const x of [-halfW, halfW])
+    for (const z of [far, near]) for (const y of [0, 2.6]) corners.push(new THREE.Vector3(x, y, z));
   return { corners, center: new THREE.Vector3(0, 0.3, (far + near) / 2) };
 }
 
@@ -255,6 +272,8 @@ function CameraRig({ layout, view }: { layout: BoardLayout; view: RefObject<Orbi
     const el = v.elevation ?? defaultEl;
     v.shownAzimuth = v.azimuth ?? defaultAz;
     v.shownElevation = el;
+    const zoom = v.zoom ?? (W / free >= 1 ? DEFAULT_ZOOM_WIDE : DEFAULT_ZOOM_TALL);
+    v.shownZoom = zoom;
 
     // Distance at which the table exactly fits the free band, for these angles.
     probe.fov = cam.fov;
@@ -262,7 +281,7 @@ function CameraRig({ layout, view }: { layout: BoardLayout; view: RefObject<Orbi
     const limitX = 0.94;
     const limitY = 0.94 * (free / virtualH);
     const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
-    let fit = dist.current / Math.max(v.zoom, 0.01);
+    let fit = dist.current / Math.max(zoom, 0.01);
     for (let i = 0; i < 4; i++) {
       probe.position.copy(bounds.center).addScaledVector(dir, fit);
       probe.lookAt(bounds.center);
@@ -275,14 +294,14 @@ function CameraRig({ layout, view }: { layout: BoardLayout; view: RefObject<Orbi
       }
       fit *= reach;
     }
-    dist.current += (fit * v.zoom - dist.current) * ease;
+    dist.current += (fit * zoom - dist.current) * ease;
 
     cam.aspect = W / virtualH;
     cam.setViewOffset(W, virtualH, 0, virtualH / 2 - freeCenter, W, H);
     cam.position.copy(bounds.center).addScaledVector(dir, dist.current);
     cam.lookAt(bounds.center);
     cam.near = 0.1;
-    cam.far = dist.current * 4;
+    cam.far = dist.current * 4 + layout.width * 12;
     cam.updateProjectionMatrix();
   });
   return null;
@@ -322,10 +341,7 @@ function BoardBase({ layout, logo }: { layout: BoardLayout; logo: THREE.Texture 
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial color={RED} roughness={0.55} metalness={0.02} />
       </mesh>
-      <mesh
-        position={[layout.logo.x, BOARD_HEIGHT + 0.004, layout.logo.z]}
-        rotation={[-Math.PI / 2, 0, 0.12]}
-      >
+      <mesh position={[layout.logo.x, BOARD_HEIGHT + 0.004, layout.logo.z]} rotation={[-Math.PI / 2, 0, 0.12]}>
         <planeGeometry args={[layout.logo.width, layout.logo.height]} />
         <meshStandardMaterial map={logo} transparent roughness={0.6} />
       </mesh>
@@ -415,8 +431,17 @@ function Discs({ layout, texture, view }: { layout: BoardLayout; texture: THREE.
 }
 
 const PAWN_PROFILE = [
-  [0, 0], [0.25, 0], [0.26, 0.035], [0.21, 0.08], [0.15, 0.13], [0.115, 0.22],
-  [0.1, 0.4], [0.135, 0.44], [0.14, 0.48], [0.09, 0.51], [0, 0.52],
+  [0, 0],
+  [0.25, 0],
+  [0.26, 0.035],
+  [0.21, 0.08],
+  [0.15, 0.13],
+  [0.115, 0.22],
+  [0.1, 0.4],
+  [0.135, 0.44],
+  [0.14, 0.48],
+  [0.09, 0.51],
+  [0, 0.52],
 ].map(([x, y]) => new THREE.Vector2(x, y));
 
 function slotOffset(team: Team, teams: Team[]) {
@@ -493,12 +518,23 @@ function Pawn({ team, teams, layout, from, active, celebrating }: PawnProps) {
 }
 
 const TIMER_GLASS = [
-  [0.22, 0], [0.25, 0.18], [0.2, 0.36], [0.07, 0.5], [0.2, 0.64], [0.25, 0.82], [0.22, 1.0],
+  [0.22, 0],
+  [0.25, 0.18],
+  [0.2, 0.36],
+  [0.07, 0.5],
+  [0.2, 0.64],
+  [0.25, 0.82],
+  [0.22, 1.0],
 ].map(([x, y]) => new THREE.Vector2(x, y));
 
 /** Sand filling the top bulb, measured up from the neck. */
 const TOP_SAND = [
-  [0, 0], [0.05, 0], [0.175, 0.14], [0.225, 0.32], [0.2, 0.4], [0, 0.4],
+  [0, 0],
+  [0.05, 0],
+  [0.175, 0.14],
+  [0.225, 0.32],
+  [0.2, 0.4],
+  [0, 0.4],
 ].map(([x, y]) => new THREE.Vector2(x, y));
 
 function propPositions(layout: BoardLayout) {
@@ -636,7 +672,15 @@ function SandTimer({ position, sand }: { position: THREE.Vector3; sand: RefObjec
 }
 
 /** A card lifts off the deck and flies up towards the viewer; the readable card then appears on screen. */
-function CardFlight({ from, cardsDrawn, texture }: { from: THREE.Vector3; cardsDrawn: number; texture: THREE.Texture }) {
+function CardFlight({
+  from,
+  cardsDrawn,
+  texture,
+}: {
+  from: THREE.Vector3;
+  cardsDrawn: number;
+  texture: THREE.Texture;
+}) {
   const mesh = useRef<THREE.Mesh>(null);
   const seen = useRef(cardsDrawn);
   const startAt = useRef<number | null>(null);

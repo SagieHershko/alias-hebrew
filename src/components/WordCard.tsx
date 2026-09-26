@@ -5,6 +5,8 @@ import type { WordResult } from '../game/types';
 import { colors, radius, shadow } from '../theme';
 
 interface Props {
+  /** Header line, e.g. which team explains and the word number. */
+  title: string;
   words: string[];
   /** 0-based index of the word the team explains (its board square number − 1). */
   highlight: number;
@@ -22,7 +24,7 @@ const EXIT_MS = 260;
  * An Alias card with 8 numbered words. The word matching the team's square is
  * big and highlighted. It rises up from the deck when drawn and flies off when answered.
  */
-export function WordCard({ words, highlight, leaving, onGone, covered }: Props) {
+export function WordCard({ title, words, highlight, leaving, onGone, covered }: Props) {
   const enter = useRef(new Animated.Value(0)).current;
   const exit = useRef(new Animated.Value(0)).current;
 
@@ -67,7 +69,9 @@ export function WordCard({ words, highlight, leaving, onGone, covered }: Props) 
         <View style={styles.bubble}>
           <Text style={styles.bubbleText}>אליאס</Text>
         </View>
-        <Text style={styles.headerText}>מסבירים את מילה {highlight + 1}</Text>
+        <Text style={styles.headerText} numberOfLines={1}>
+          {title}
+        </Text>
       </View>
       {covered ? (
         <View style={styles.covered}>
@@ -112,7 +116,7 @@ export function WordCard({ words, highlight, leaving, onGone, covered }: Props) 
 
 const styles = StyleSheet.create({
   card: {
-    width: '92%',
+    width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
     backgroundColor: colors.white,

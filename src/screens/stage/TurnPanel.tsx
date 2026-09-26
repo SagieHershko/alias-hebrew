@@ -11,7 +11,7 @@ import type { WordResult } from '../../game/types';
 import { useCountdown } from '../../hooks/useCountdown';
 import { colors, radius, readableOn, shadow } from '../../theme';
 import { TIMER_FLIP_MS, type SandState } from '../../three/Board3D';
-import { GLASS, panel } from './panel';
+import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
 function buzz(kind: WordResult | 'timeUp') {
@@ -46,12 +46,15 @@ interface Props {
 export function TurnPanel({ sand, onCardShown }: Props) {
   const { state, dispatch } = useGame();
   const insets = useSafeAreaInsets();
-  const stage = useStageInsets({ top: true, bottom: true });
+  const stage = useStageInsets({ top: false, bottom: true });
   const team = currentTeam(state)!;
   const total = state.settings.turnSeconds;
   const timer = useCountdown(total, () => buzz('timeUp'), TIMER_FLIP_MS);
   const lastWord = timer.expired;
   const [leaving, setLeaving] = useState<LeavingCard[]>([]);
+
+  // No top bar during a turn: the table may use the whole height (below the status bar).
+  useEffect(() => stage.setTop(insets.top), [stage, insets.top]);
 
   // Flip the sand timer when the turn starts; leave the sand at the bottom when it ends.
   useEffect(() => {
@@ -77,6 +80,7 @@ export function TurnPanel({ sand, onCardShown }: Props) {
   const points = turnPoints(state.turnWords, state.settings, team.id);
   // The explaining team first, then everyone else.
   const guessers = [team, ...state.teams.filter((t) => t.id !== team.id)];
+  const title = `${team.name} מסבירים · מילה ${state.wordIndex + 1}`;
 
   const answer = (result: WordResult) => {
     if (timer.paused || !state.currentCard) return;
@@ -91,60 +95,64 @@ export function TurnPanel({ sand, onCardShown }: Props) {
 
   return (
     <View style={panel.layer} pointerEvents="box-none">
-      {/* ── HUD ───────────────────────────── */}
-      <View style={[panel.top, { paddingTop: insets.top + 8 }]} onLayout={stage.onTopLayout}>
-        <View style={panel.row}>
-          <Pressable
-            onPress={timer.paused ? timer.resume : timer.pause}
-            disabled={lastWord || !timer.started}
-            style={[panel.iconBtn, (lastWord || !timer.started) && styles.hidden]}
-            accessibilityRole="button"
-            accessibilityLabel={timer.paused ? 'המשך' : 'השהיה'}
-          >
-            <Text style={panel.iconText}>{timer.paused ? '▶' : '❚❚'}</Text>
-          </Pressable>
-          <View style={panel.flex}>
-            <Text style={panel.subtitle}>מסבירים</Text>
-            <Text style={[panel.title, { fontSize: 20 }]} numberOfLines={1}>
-              {team.name}
-            </Text>
-          </View>
-          <Text style={styles.counter}>✓ {correctCount}</Text>
-          <Text style={styles.counter}>↷ {skippedCount}</Text>
-          <View style={[styles.clock, timer.secondsLeft <= 10 && styles.clockUrgent]}>
-            <Text style={styles.clockText} accessibilityLiveRegion="polite">
-              {lastWord ? '0' : timer.secondsLeft}
-            </Text>
-          </View>
-          <View style={styles.points}>
-            <Text style={styles.pointsText}>{points > 0 ? `+${points}` : points}</Text>
-          </View>
-        </View>
-      </View>
-
       {/* ── Card + actions, stacked at the bottom so the table stays visible above ── */}
       <View style={styles.bottomStack} onLayout={stage.onBottomLayout} pointerEvents="box-none">
-        <View style={styles.cardArea} pointerEvents="none">
-          {!timer.started && (
-            <View style={styles.flipNote}>
-              <Text style={styles.flipText}>הופכים את שעון החול…</Text>
+        <View style={styles.cardRow} pointerEvents="box-none">
+          {/* Turn status floats on the table, to the right of the card (first child = right in RTL). */}
+          <View style={styles.stats} pointerEvents="box-none">
+            <View style={[styles.clock, timer.secondsLeft <= 10 && styles.clockUrgent]}>
+              <Text style={styles.clockText} accessibilityLiveRegion="polite">
+                {lastWord ? '0' : timer.secondsLeft}
+              </Text>
+              <Text style={styles.clockUnit}>שניות</Text>
             </View>
-          )}
-          {leaving.map((c) => (
-            <View key={`out-${c.key}`} style={styles.cardSlot}>
-              <WordCard
-                words={c.words}
-                highlight={state.wordIndex}
-                leaving={c.result}
-                onGone={() => setLeaving((cards) => cards.filter((x) => x.key !== c.key))}
-              />
+            <View style={styles.stat}>
+              <Text style={[styles.statText, { color: '#7BE39B' }]}>✓ {correctCount}</Text>
             </View>
-          ))}
-          {timer.started && state.currentCard && (
-            <View key={`in-${state.cardsDrawn}`} style={styles.cardSlot}>
-              <WordCard words={state.currentCard} highlight={state.wordIndex} covered={timer.paused && !lastWord} />
+            <View style={styles.stat}>
+              <Text style={[styles.statText, { color: '#FF9A9A' }]}>↷ {skippedCount}</Text>
             </View>
-          )}
+            <View style={styles.points}>
+              <Text style={styles.pointsText}>{points > 0 ? `+${points}` : points}</Text>
+            </View>
+            <Pressable
+              onPress={timer.paused ? timer.resume : timer.pause}
+              disabled={lastWord || !timer.started}
+              style={[styles.stat, (lastWord || !timer.started) && styles.hidden]}
+              accessibilityRole="button"
+              accessibilityLabel={timer.paused ? 'המשך' : 'השהיה'}
+            >
+              <Text style={styles.statText}>{timer.paused ? '▶' : '❚❚'}</Text>
+            </Pressable>
+          </View>
+          <View style={styles.cardArea} pointerEvents="none">
+            {!timer.started && (
+              <View style={styles.flipNote}>
+                <Text style={styles.flipText}>הופכים את שעון החול…</Text>
+              </View>
+            )}
+            {leaving.map((c) => (
+              <View key={`out-${c.key}`} style={styles.cardSlot}>
+                <WordCard
+                  title={title}
+                  words={c.words}
+                  highlight={state.wordIndex}
+                  leaving={c.result}
+                  onGone={() => setLeaving((cards) => cards.filter((x) => x.key !== c.key))}
+                />
+              </View>
+            ))}
+            {timer.started && state.currentCard && (
+              <View key={`in-${state.cardsDrawn}`} style={styles.cardSlot}>
+                <WordCard
+                  title={title}
+                  words={state.currentCard}
+                  highlight={state.wordIndex}
+                  covered={timer.paused && !lastWord}
+                />
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={[styles.actions, { paddingBottom: insets.bottom + 14 }]}>
@@ -199,31 +207,54 @@ export function TurnPanel({ sand, onCardShown }: Props) {
 
 const styles = StyleSheet.create({
   hidden: { opacity: 0 },
-  counter: { color: colors.white, fontSize: 17, fontWeight: '800' },
+  cardRow: {
+    height: CARD_AREA,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 500,
+    paddingHorizontal: 8,
+    gap: 8,
+  },
+  stats: { width: 62, gap: 8, alignItems: 'center', paddingBottom: 10 },
+  // Floating chips: dark glass so they read on top of the room.
   clock: {
-    minWidth: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     borderWidth: 3,
     borderColor: colors.white,
+    backgroundColor: 'rgba(20,20,24,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
   },
   clockUrgent: { borderColor: colors.gold },
-  clockText: { color: colors.white, fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  clockText: { color: colors.white, fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'], lineHeight: 26 },
+  clockUnit: { color: '#D8D8DC', fontSize: 10, fontWeight: '700' },
+  stat: {
+    minWidth: 56,
+    height: 38,
+    borderRadius: 19,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(20,20,24,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statText: { color: colors.white, fontSize: 17, fontWeight: '900' },
   points: {
-    minWidth: 48,
-    height: 48,
-    borderRadius: 24,
+    minWidth: 56,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    ...shadow,
   },
   pointsText: { color: colors.red, fontWeight: '900', fontSize: 18 },
   bottomStack: { position: 'absolute', bottom: 0, start: 0, end: 0 },
-  cardArea: { height: CARD_AREA },
+  cardArea: { flex: 1, height: CARD_AREA },
   cardSlot: {
     position: 'absolute',
     top: 0,
@@ -235,11 +266,11 @@ const styles = StyleSheet.create({
   },
   actions: {
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 4,
     gap: 10,
-    backgroundColor: GLASS,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   flipNote: {
     position: 'absolute',
@@ -251,7 +282,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   flipText: { color: colors.white, fontSize: 18, fontWeight: '800' },
-  lastTitle: { color: colors.gold, fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  lastTitle: {
+    alignSelf: 'center',
+    color: colors.gold,
+    fontSize: 19,
+    fontWeight: '900',
+    textAlign: 'center',
+    backgroundColor: 'rgba(20,20,24,0.75)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
   guesserRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   guesserBtn: {
     flexGrow: 1,

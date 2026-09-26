@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { colors, radius } from '../../theme';
 
 /** Shared look of the panels floating over the 3D table. */
-export const GLASS = 'rgba(18,18,22,0.62)';
+export const GLASS = 'rgba(18,18,22,0.68)';
 
 export const panel = StyleSheet.create({
   layer: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 },
@@ -31,6 +31,16 @@ export const panel = StyleSheet.create({
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
   },
+  /** No banner: the panel content floats directly over the room. */
+  clear: { backgroundColor: 'transparent' },
+  /** Small dark-glass bubble behind floating text, so it reads over the room. */
+  pill: {
+    alignSelf: 'flex-start',
+    backgroundColor: GLASS,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   flex: { flex: 1 },
   title: { color: colors.white, fontSize: 24, fontWeight: '900' },
@@ -43,7 +53,7 @@ export const panel = StyleSheet.create({
     height: 44,
     paddingHorizontal: 10,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: GLASS,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -53,7 +63,7 @@ export const panel = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: GLASS,
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 5,

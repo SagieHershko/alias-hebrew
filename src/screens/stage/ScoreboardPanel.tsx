@@ -31,11 +31,13 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
 
   return (
     <View style={panel.layer} pointerEvents="box-none">
-      <View style={[panel.top, { paddingTop: insets.top + 8 }]} onLayout={stage.onTopLayout}>
+      <View style={[panel.top, panel.clear, { paddingTop: insets.top + 8 }]} onLayout={stage.onTopLayout}>
         <View style={panel.row}>
           <View style={panel.flex}>
-            <Text style={panel.title}>סיבוב {state.round}</Text>
-            <Text style={panel.subtitle}>משבצת הסיום: {state.settings.targetScore}</Text>
+            <View style={panel.pill}>
+              <Text style={panel.title}>סיבוב {state.round}</Text>
+              <Text style={panel.subtitle}>משבצת הסיום: {state.settings.targetScore}</Text>
+            </View>
           </View>
           <Pressable
             onPress={onResetView}
@@ -67,16 +69,18 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
         </View>
       </View>
 
-      <View style={[panel.bottom, { paddingBottom: insets.bottom + 14 }]} onLayout={stage.onBottomLayout}>
-        <View style={[panel.row, { justifyContent: 'center' }]}>
-          <View style={[panel.dot, { backgroundColor: next.color, width: 18, height: 18, borderRadius: 9 }]} />
-          <Text style={panel.text}>
-            התור של: <Text style={panel.bold}>{next.name}</Text>
+      <View style={[panel.bottom, panel.clear, { paddingBottom: insets.bottom + 14 }]} onLayout={stage.onBottomLayout}>
+        <View style={[panel.pill, { alignSelf: 'center', alignItems: 'center', gap: 2 }]}>
+          <View style={[panel.row, { justifyContent: 'center' }]}>
+            <View style={[panel.dot, { backgroundColor: next.color, width: 18, height: 18, borderRadius: 9 }]} />
+            <Text style={panel.text}>
+              התור של: <Text style={panel.bold}>{next.name}</Text>
+            </Text>
+          </View>
+          <Text style={panel.hint}>
+            הפיון על משבצת {wordNo}, לכן מסבירים את מילה {wordNo} בכל קלף · גררו לסיבוב הלוח, צבטו לזום
           </Text>
         </View>
-        <Text style={panel.hint}>
-          הפיון על משבצת {wordNo}, לכן מסבירים את מילה {wordNo} בכל קלף · גררו לסיבוב הלוח, צבטו לזום
-        </Text>
         <BigButton label="התחלת תור ⏳" variant="primary" large onPress={() => dispatch({ type: 'BEGIN_TURN' })} />
       </View>
     </View>
