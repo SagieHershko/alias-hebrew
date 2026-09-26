@@ -23,10 +23,19 @@ export function GameStage() {
   const next = currentTeam(state)!;
   const insets = useMemo<StageInsets>(
     () => ({
-      onTopLayout: (e) => (view.current.insetTop = e.nativeEvent.layout.height),
-      onBottomLayout: (e) => (view.current.insetBottom = e.nativeEvent.layout.height),
-      setTop: (px) => (view.current.insetTop = px),
-      setBottom: (px) => (view.current.insetBottom = px),
+      // Block bodies: these must return nothing (callers may use them as effect bodies).
+      onTopLayout: (e) => {
+        view.current.insetTop = e.nativeEvent.layout.height;
+      },
+      onBottomLayout: (e) => {
+        view.current.insetBottom = e.nativeEvent.layout.height;
+      },
+      setTop: (px) => {
+        view.current.insetTop = px;
+      },
+      setBottom: (px) => {
+        view.current.insetBottom = px;
+      },
     }),
     [],
   );

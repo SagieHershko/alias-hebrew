@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>אליאס – משחק מילים לכל המשפחה</title>
     <meta name="theme-color" content="#E30613" />
     <meta name="description" content="אליאס – משחק ניחוש מילים בעברית לכל המשפחה" />
@@ -18,6 +18,10 @@
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
+        /* No pull-to-refresh / page bounce while dragging the board. */
+        overscroll-behavior: none;
+        /* No double-tap zoom, without delaying or swallowing fast taps. */
+        touch-action: manipulation;
       }
       /* These styles make the root element full-height */
       #root {
@@ -34,6 +38,16 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
+    <script>
+      // A pinch should zoom the 3D board, never the whole page (the app handles two-finger
+      // gestures itself). Safari ignores user-scalable=no, so block its gesture events too.
+      ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+        document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+      });
+      document.addEventListener('touchmove', function (e) {
+        if (e.touches.length > 1) e.preventDefault();
+      }, { passive: false });
+    </script>
 
 </body>
 </html>

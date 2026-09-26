@@ -54,7 +54,9 @@ export function TurnPanel({ sand, onCardShown }: Props) {
   const [leaving, setLeaving] = useState<LeavingCard[]>([]);
 
   // No top bar during a turn: the table may use the whole height (below the status bar).
-  useEffect(() => stage.setTop(insets.top), [stage, insets.top]);
+  useEffect(() => {
+    stage.setTop(insets.top);
+  }, [stage, insets.top]);
 
   // Flip the sand timer when the turn starts; leave the sand at the bottom when it ends.
   useEffect(() => {

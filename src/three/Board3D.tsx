@@ -140,7 +140,7 @@ export function Board3D({ style, interactive = false, view: viewProp, sand: sand
   }, [view]);
 
   return (
-    <View style={[styles.stage, style]} {...(interactive ? gestures.panHandlers : {})}>
+    <View style={[styles.stage, interactive && styles.touchNone, style]} {...(interactive ? gestures.panHandlers : {})}>
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -718,4 +718,6 @@ function CardFlight({
 
 const styles = StyleSheet.create({
   stage: { backgroundColor: STAGE, overflow: 'hidden' },
+  // Web: the browser must not pan or zoom the page for drags / pinches on the board.
+  touchNone: Platform.OS === 'web' ? ({ touchAction: 'none' } as ViewStyle) : {},
 });

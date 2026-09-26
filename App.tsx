@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { GameProvider, useGame } from './src/game/GameContext';
 import { SetupScreen } from './src/screens/SetupScreen';
 import { GameStage } from './src/screens/stage/GameStage';
@@ -23,7 +24,9 @@ export default function App() {
         {/* direction: 'rtl' makes every row flow right-to-left immediately, even
             before I18nManager.forceRTL has taken effect (Expo Go, web). */}
         <View style={styles.root}>
-          <CurrentScreen />
+          <ErrorBoundary>
+            <CurrentScreen />
+          </ErrorBoundary>
         </View>
         <StatusBar style="light" />
       </GameProvider>
