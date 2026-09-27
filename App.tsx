@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
@@ -49,6 +50,8 @@ export default function App() {
         </ErrorBoundary>
       </View>
       <StatusBar style="light" />
+      {/* Vercel Web Analytics (page views); the web build is what's deployed on Vercel. */}
+      {Platform.OS === 'web' && <Analytics />}
     </SafeAreaProvider>
   );
 }

@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
     "@react-three/fiber": "^9.8.1",
+    "@vercel/analytics": "^2.0.1",
     "expo": "~57.0.25",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
