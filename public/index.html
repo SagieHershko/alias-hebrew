@@ -7,6 +7,18 @@
     <title>אליאס – משחק מילים לכל המשפחה</title>
     <meta name="theme-color" content="#E30613" />
     <meta name="description" content="אליאס – משחק ניחוש מילים בעברית לכל המשפחה" />
+    <!-- One font for the whole game (Hebrew + Latin, every weight). Without it each browser
+         picks its own system fonts, and heavy weights fall back to a different Hebrew font. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <style>
+      /* React Native Web puts the system font on every Text / TextInput; use Heebo instead. */
+      #root,
+      #root * {
+        font-family: 'Heebo', 'Segoe UI', Arial, sans-serif !important;
+      }
+    </style>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
       /* These styles make the body full-height */
