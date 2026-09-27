@@ -3,14 +3,11 @@
 A digital version of the family word game **אליאס**, built with React Native and TypeScript.
 
 <p>
-  <img src="docs/screenshots/1-setup.png" width="180" alt="מסך פתיחה" />
-  <img src="docs/screenshots/2-board.png" width="180" alt="לוח המשחק" />
-  <img src="docs/screenshots/3-game.png" width="180" alt="תור פעיל" />
-  <img src="docs/screenshots/7-board-fullscreen.png" width="180" alt="סיבוב הלוח" />
-</br>
-  <img src="docs/screenshots/8-room.png" width="320" alt="הסלון" />
-  </br>
-  <img src="docs/screenshots/5-summary.png" width="180" alt="סיכום תור" />
+  <img src="docs/screenshots/1-setup.png" width="19%" alt="מסך פתיחה" />
+  <img src="docs/screenshots/2-board.png" width="19%" alt="לוח המשחק" />
+  <img src="docs/screenshots/3-game.png" width="19%" alt="תור פעיל" />
+  <img src="docs/screenshots/7-board-fullscreen.png" width="19%" alt="סיבוב הלוח" />
+  <img src="docs/screenshots/5-summary.png" width="19%" alt="סיכום תור" />
 </p>
 
 ## How to play 
