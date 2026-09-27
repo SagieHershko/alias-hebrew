@@ -1,17 +1,19 @@
 # אליאס – Alias (Hebrew)
 
-A digital, Hebrew-only, right-to-left version of the family word game **אליאס**, built with React Native, Expo (SDK 57) and TypeScript.
+A digital version of the family word game **אליאס**, built with React Native and TypeScript.
 
 <p>
   <img src="docs/screenshots/1-setup.png" width="180" alt="מסך פתיחה" />
   <img src="docs/screenshots/2-board.png" width="180" alt="לוח המשחק" />
   <img src="docs/screenshots/3-game.png" width="180" alt="תור פעיל" />
   <img src="docs/screenshots/7-board-fullscreen.png" width="180" alt="סיבוב הלוח" />
+</br>
   <img src="docs/screenshots/8-room.png" width="320" alt="הסלון" />
+  </br>
   <img src="docs/screenshots/5-summary.png" width="180" alt="סיכום תור" />
 </p>
 
-## How to play (איך משחקים)
+## How to play 
 
 - 4–12 players split into 2–6 teams.
 - On each turn one player explains as many words as possible before the sand timer runs out (60 seconds by default).
@@ -176,3 +178,5 @@ All state lives in a single reducer (`src/game/gameReducer.ts`):
 ## Adding words
 
 Add strings to `RAW_WORDS` in `src/data/words.ts`. Duplicates are removed automatically.
+
+Developed by Sagie Hershko
