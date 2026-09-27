@@ -197,7 +197,7 @@ export function SetupScreen({ onBack }: { onBack?: () => void }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { paddingHorizontal: 16, gap: 16 },
+  content: { paddingHorizontal: 16, gap: 16, maxWidth: 560, width: '100%', alignSelf: 'center' },
   back: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.18)',

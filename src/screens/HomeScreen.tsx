@@ -27,7 +27,8 @@ export function HomeScreen({ onLocal, onOnline }: { onLocal: () => void; onOnlin
 
 const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 36, paddingHorizontal: 20 },
-  options: { alignSelf: 'stretch', maxWidth: 460, width: '100%', alignItems: 'stretch', gap: 22 },
+  // Full width on phones, a centred column of at most 460 px on wide screens.
+  options: { alignSelf: 'center', maxWidth: 460, width: '100%', alignItems: 'stretch', gap: 22 },
   option: { gap: 8 },
   note: {
     color: colors.white,
