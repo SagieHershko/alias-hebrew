@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { BigButton } from '../../components/BigButton';
 import { MuteButton } from '../../components/MuteButton';
+import { TableIcon } from '../../components/TableIcon';
 import { currentTeam, wordIndexFor } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import { colors } from '../../theme';
@@ -12,7 +13,7 @@ import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
 /** Between turns: standings on top, whose turn it is and the start button at the bottom. */
-export function ScoreboardPanel({ onResetView, onRoomView }: { onResetView: () => void; onRoomView: () => void }) {
+export function ScoreboardPanel({ onToggleView }: { onToggleView: () => void }) {
   const { state, dispatch, online } = useGame();
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: true, bottom: true });
@@ -54,24 +55,14 @@ export function ScoreboardPanel({ onResetView, onRoomView }: { onResetView: () =
               </Text>
             </View>
           </View>
-          {/* Online: swing out to the living room to see everyone on the sofas (and back). */}
-          {online && (
-            <Pressable
-              onPress={onRoomView}
-              style={panel.iconBtn}
-              accessibilityRole="button"
-              accessibilityLabel="מבט על הסלון והשחקנים"
-            >
-              <Text style={panel.iconText}>🛋️</Text>
-            </Pressable>
-          )}
+          {/* One view button: out to the living room (players on the sofas), and back to the board. */}
           <Pressable
-            onPress={onResetView}
+            onPress={onToggleView}
             style={panel.iconBtn}
             accessibilityRole="button"
-            accessibilityLabel="איפוס זווית הלוח"
+            accessibilityLabel="מבט על הסלון / חזרה ללוח"
           >
-            <Text style={panel.iconText}>⟲</Text>
+            <TableIcon size={24} />
           </Pressable>
           <MuteButton style={panel.iconBtn} />
           <Pressable
