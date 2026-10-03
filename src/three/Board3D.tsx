@@ -222,9 +222,9 @@ function Scene({
     t.anisotropy = 8;
   }
   const props = useMemo(() => propPositions(layout, teams.length), [layout, teams.length]);
-  // Online: every player sits on a sofa in their team's colour.
+  // Online: every player sits on their team's sofa, in the team's colour.
   const sitters = useMemo(
-    () => teams.flatMap((t) => (t.players ?? []).map((p) => ({ id: p.id, color: t.color }))),
+    () => teams.flatMap((t, team) => (t.players ?? []).map((p) => ({ id: p.id, color: t.color, team }))),
     [teams],
   );
 

@@ -334,19 +334,14 @@ export function LivingRoom({
 
   const at = (x: number, z: number) => new THREE.Vector3(cx + x, floorY, cz + z);
 
-  // Fill both sofas in proportion to their free seat length: the back one (44u) loses its arm
-  // and the chaise end (legs would go through the chaise), the front one (34u) its arms.
+  // Free seat length: the back sofa (44u) loses its arm and the chaise end (legs would go
+  // through the chaise), the front one (34u) its arms.
   const backSeats: [number, number] = [-18 * u, 4 * u];
   const frontSeats: [number, number] = [-13 * u, 13 * u];
-  const backLen = backSeats[1] - backSeats[0];
-  // The back sofa faces the default camera, so it fills first (up to 4 at full size); only a
-  // bigger group spills onto the front sofa, shared in proportion to the two sofas' lengths.
-  const backCount = Math.min(
-    sitters.length,
-    Math.max(4, Math.round((sitters.length * backLen) / (backLen + frontSeats[1] - frontSeats[0]))),
-  );
-  const backSitters = sitters.slice(0, backCount);
-  const frontSitters = sitters.slice(backCount);
+  // Rival teams face each other across the table: teams 1, 3, 5 on the back sofa,
+  // teams 2, 4, 6 on the front one.
+  const backSitters = sitters.filter((s) => s.team % 2 === 0);
+  const frontSitters = sitters.filter((s) => s.team % 2 === 1);
 
   return (
     <group>

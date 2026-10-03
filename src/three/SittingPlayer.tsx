@@ -203,6 +203,8 @@ export function SittingPlayer({
 export interface Sitter {
   id: string;
   color: string;
+  /** Team index: picks the sofa. */
+  team: number;
 }
 
 /**
