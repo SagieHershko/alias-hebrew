@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
@@ -10,6 +10,7 @@ import { WordCard } from '../../components/WordCard';
 import { currentTeam, turnPoints } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import type { WordResult } from '../../game/types';
+import { useCompactLandscape } from '../../hooks/useCompactLandscape';
 import { useTurnClock } from '../../hooks/useTurnClock';
 import { serverNow } from '../../online/serverTime';
 import { colors, radius, readableOn, RLM, shadow } from '../../theme';
@@ -31,6 +32,9 @@ function buzz(kind: WordResult | 'timeUp') {
 
 /** Room for the card between the table and the buttons. */
 const CARD_AREA = 362;
+/** The word card's size (see WordCard), with the slot's bottom padding. */
+const CARD_WIDTH = 270;
+const CARD_HEIGHT = 410;
 
 interface LeavingCard {
   key: number;
@@ -69,6 +73,28 @@ export function TurnPanel({ sand, onCardShown }: Props) {
   useEffect(() => {
     stage.setTop(insets.top);
   }, [stage, insets.top]);
+
+  // A phone on its side: card and buttons side by side, the card shrunk to fit the height.
+  const landscape = useCompactLandscape();
+  const { height: screenH } = useWindowDimensions();
+  const cardScale = landscape
+    ? Math.min(1, (screenH - insets.top - insets.bottom - 16) / CARD_HEIGHT)
+    : 1;
+  useEffect(() => {
+    // Nothing is stacked at the bottom, so the table keeps the whole height behind the card.
+    if (landscape) stage.setBottom(0);
+  }, [stage, landscape]);
+  const landscapeCard = {
+    width: CARD_WIDTH,
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    transform: [{ scale: cardScale }],
+    // The scaled card takes only its visible size in the row.
+    marginHorizontal: (-CARD_WIDTH * (1 - cardScale)) / 2,
+    marginVertical: (-CARD_HEIGHT * (1 - cardScale)) / 2,
+  };
 
   // Flip the sand timer when the turn starts; leave the sand at the bottom when it ends.
   useEffect(() => {
@@ -166,9 +192,18 @@ export function TurnPanel({ sand, onCardShown }: Props) {
 
   return (
     <View style={panel.layer} pointerEvents="box-none">
-      {/* ── Card + actions, stacked at the bottom so the table stays visible above ── */}
-      <View style={styles.bottomStack} onLayout={stage.onBottomLayout} pointerEvents="box-none">
-        <View style={styles.cardRow} pointerEvents="box-none">
+      {/* ── Card + actions, stacked at the bottom so the table stays visible above
+             (side by side, filling the height, on a phone held sideways) ── */}
+      <View
+        style={[
+          styles.bottomStack,
+          landscape && styles.landscapeStack,
+          landscape && { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 },
+        ]}
+        onLayout={landscape ? undefined : stage.onBottomLayout}
+        pointerEvents="box-none"
+      >
+        <View style={[styles.cardRow, landscape && styles.landscapeCardRow]} pointerEvents="box-none">
           {/* Turn status floats on the table, to the right of the card (first child = right in RTL). */}
           <View style={styles.stats} pointerEvents="box-none">
             <View style={[styles.clock, timer.secondsLeft <= 10 && styles.clockUrgent]}>
@@ -197,7 +232,7 @@ export function TurnPanel({ sand, onCardShown }: Props) {
             </Pressable>
             <MuteButton style={styles.stat} />
           </View>
-          <View style={styles.cardArea} pointerEvents="none">
+          <View style={[styles.cardArea, landscape && landscapeCard]} pointerEvents="none">
             {!timer.started && (
               <View style={styles.flipNote}>
                 <Text style={styles.flipText}>הופכים את שעון החול…</Text>
@@ -232,7 +267,7 @@ export function TurnPanel({ sand, onCardShown }: Props) {
           </View>
         </View>
 
-        <View style={[styles.actions, { paddingBottom: insets.bottom + 14 }]}>
+        <View style={[styles.actions, landscape ? styles.landscapeActions : { paddingBottom: insets.bottom + 14 }]}>
           {!canAct ? (
             <Text style={styles.lastTitle}>
               {lastWord
@@ -329,6 +364,17 @@ const styles = StyleSheet.create({
   },
   pointsText: { color: colors.red, fontWeight: '900', fontSize: 18 },
   bottomStack: { position: 'absolute', bottom: 0, start: 0, end: 0 },
+  // Phone on its side: [card + stats] beside [actions], filling the height, centred.
+  landscapeStack: {
+    top: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: 16,
+  },
+  landscapeCardRow: { height: 'auto', width: 'auto', maxWidth: '100%', alignSelf: 'auto', alignItems: 'center' },
+  landscapeActions: { width: 300, maxWidth: '45%', alignSelf: 'center', paddingHorizontal: 0, paddingTop: 0 },
   cardArea: { flex: 1, height: CARD_AREA },
   cardSlot: {
     position: 'absolute',
