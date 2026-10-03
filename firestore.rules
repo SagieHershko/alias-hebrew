@@ -64,8 +64,19 @@ service cloud.firestore {
       function onlyMyPlayerEntry() {
         return changed().hasOnly(['players'])
           && after().players.diff(before().players).affectedKeys().hasOnly([uid()])
-          && (!(uid() in after().players) || validPlayer(after().players[uid()]));
+          && (!(uid() in after().players) || validPlayer(after().players[uid()]))
+          && teamFixedDuringGame();
       }
+      // While a game runs nobody switches team, and someone joining mid-game only watches.
+      function teamFixedDuringGame() {
+        return before().status == 'lobby'
+          || !(uid() in after().players)
+          || (uid() in before().players
+              && after().players[uid()].teamIndex == before().players[uid()].teamIndex)
+          || (!(uid() in before().players) && after().players[uid()].teamIndex == null);
+      }
+      // On a team: may play (spectators who joined mid-game have no team).
+      function isPlayer() { return isMember() && before().players[uid()].teamIndex != null; }
 
       // A missing room reads as "not found" (so a new code can be checked before creating it).
       allow get: if signedIn() && (resource == null || live(resource.data));
@@ -83,7 +94,7 @@ service cloud.firestore {
 
       allow update: if live(before()) && validRoom(after()) && (
         onlyMyPlayerEntry()
-        || (isMember() && changed().hasOnly(['game', 'rev', 'updatedAt'])
+        || (isPlayer() && changed().hasOnly(['game', 'rev', 'updatedAt'])
             && after().rev == before().rev + 1 && stamped() && notTooFast())
         // Any player may recolour the pawns in the lobby.
         || (isMember() && before().status == 'lobby' && changed().hasOnly(['teamColors', 'updatedAt'])

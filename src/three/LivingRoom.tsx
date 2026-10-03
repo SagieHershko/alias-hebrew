@@ -339,7 +339,12 @@ export function LivingRoom({
   const backSeats: [number, number] = [-18 * u, 4 * u];
   const frontSeats: [number, number] = [-13 * u, 13 * u];
   const backLen = backSeats[1] - backSeats[0];
-  const backCount = Math.round((sitters.length * backLen) / (backLen + frontSeats[1] - frontSeats[0]));
+  // The back sofa faces the default camera, so it fills first (up to 4 at full size); only a
+  // bigger group spills onto the front sofa, shared in proportion to the two sofas' lengths.
+  const backCount = Math.min(
+    sitters.length,
+    Math.max(4, Math.round((sitters.length * backLen) / (backLen + frontSeats[1] - frontSeats[0]))),
+  );
   const backSitters = sitters.slice(0, backCount);
   const frontSitters = sitters.slice(backCount);
 

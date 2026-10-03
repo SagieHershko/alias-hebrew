@@ -31,6 +31,8 @@ const MIN_ELEVATION = THREE.MathUtils.degToRad(18);
 const MAX_ELEVATION = THREE.MathUtils.degToRad(88);
 const MIN_ZOOM = 0.5; // 1 = the whole table exactly fits the screen
 const MAX_ZOOM = 2.8; // zoomed out: the whole living room
+/** Pixels a finger must move before it counts as turning the board (not a tap). */
+const DRAG_THRESHOLD = 8;
 // Starting zoom: on a wide screen the living room shows around the table; on a tall phone screen
 // the board stays big enough to read.
 const DEFAULT_ZOOM_WIDE = 1.75;
@@ -75,7 +77,8 @@ const ROOM_ZOOM = 2.6;
  */
 export function toggleView(view: OrbitView) {
   if (view.azimuth !== null || view.elevation !== null || view.zoom !== null) return resetView(view);
-  view.azimuth = 0;
+  // From the window side: both sofas face the camera's sides, so nobody is hidden behind a sofa.
+  view.azimuth = -Math.PI / 2;
   view.elevation = THREE.MathUtils.degToRad(34);
   view.zoom = ROOM_ZOOM;
   view.lastInteraction = Date.now();
@@ -130,6 +133,8 @@ export function Board3D({ style, interactive = false, view: viewProp, sand: sand
   const gestures = useMemo(() => {
     let start = { az: 0, el: 0, zoom: 1 };
     let pinch: number | null = null;
+    // A tap always jitters a few pixels: only a real drag turns the board (and leaves the default view).
+    let dragging = false;
     const touchDistance = (touches: { pageX: number; pageY: number }[]) =>
       Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
     return PanResponder.create({
@@ -139,10 +144,10 @@ export function Board3D({ style, interactive = false, view: viewProp, sand: sand
         const v = view.current!;
         start = { az: v.shownAzimuth, el: v.shownElevation, zoom: v.shownZoom };
         pinch = null;
+        dragging = false;
       },
       onPanResponderMove: (evt, g) => {
         const v = view.current!;
-        v.lastInteraction = Date.now();
         const touches = evt.nativeEvent.touches as unknown as { pageX: number; pageY: number }[] | undefined;
         if (touches && touches.length >= 2) {
           const d = touchDistance(touches);
@@ -151,8 +156,12 @@ export function Board3D({ style, interactive = false, view: viewProp, sand: sand
             start.zoom = v.shownZoom;
           }
           v.zoom = clamp((start.zoom * pinch) / d, MIN_ZOOM, MAX_ZOOM);
+          v.lastInteraction = Date.now();
           return;
         }
+        if (!dragging && Math.hypot(g.dx, g.dy) < DRAG_THRESHOLD) return;
+        dragging = true;
+        v.lastInteraction = Date.now();
         v.azimuth = start.az - g.dx * 0.008;
         v.elevation = clamp(start.el + g.dy * 0.006, MIN_ELEVATION, MAX_ELEVATION);
       },

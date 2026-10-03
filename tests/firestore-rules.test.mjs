@@ -65,6 +65,11 @@ await t('host starts the game', assertSucceeds(updateDoc(ref(db('host')), { stat
 console.log('Playing');
 await wait(150);
 await t('stranger cannot change the game', assertFails(updateDoc(ref(db('eve')), { game: '{"x":1}', rev: 2, updatedAt: serverTimestamp() })));
+await t('mid-game joiner cannot pick a team', assertFails(updateDoc(ref(db('carol')), { 'players.carol': player('Carol', 0) })));
+await t('mid-game joiner may watch (no team)', assertSucceeds(updateDoc(ref(db('carol')), { 'players.carol': player('Carol', null) })));
+await t('spectator cannot change the game', assertFails(updateDoc(ref(db('carol')), { game: '{"x":1}', rev: 2, updatedAt: serverTimestamp() })));
+await t('spectator cannot join a team mid-game', assertFails(updateDoc(ref(db('carol')), { 'players.carol.teamIndex': 1 })));
+await t('player cannot switch team mid-game', assertFails(updateDoc(ref(db('bob')), { 'players.bob.teamIndex': 0 })));
 await t('member must bump rev by exactly 1', assertFails(updateDoc(ref(db('bob')), { game: '{"x":1}', rev: 5, updatedAt: serverTimestamp() })));
 await t('member cannot change the status', assertFails(updateDoc(ref(db('bob')), { status: 'lobby', game: null, rev: 2, updatedAt: serverTimestamp() })));
 await t('member updates the game', assertSucceeds(updateDoc(ref(db('bob')), { game: '{"x":1}', rev: 2, updatedAt: serverTimestamp() })));

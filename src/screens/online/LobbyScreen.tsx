@@ -15,6 +15,7 @@ import {
   chooseTeam,
   inviteUrl,
   leaveLobby,
+  removeTeam,
   roomColors,
   setTeamColor,
   startGame,
@@ -193,11 +194,7 @@ function TeamCard({ room, index, players, editable, mine, onJoin }: TeamCardProp
   };
   const pawnColors = roomColors(room);
   const [colorOpen, setColorOpen] = useState(false);
-  const remove = () =>
-    updateLobby(room.code, {
-      teamNames: room.teamNames.filter((_, i) => i !== index),
-      teamColors: pawnColors.filter((_, i) => i !== index),
-    });
+  const remove = () => removeTeam(room.code, index);
 
   return (
     <View style={[styles.card, mine && styles.cardMine]}>

@@ -184,7 +184,7 @@ export async function setTeamColor(code: string, index: number, color: string) {
   );
 }
 
-/** Host: rename teams, add / remove a team (with its colour), change the settings. */
+/** Host: rename teams, add a team (with its colour), change the settings. To remove a team use removeTeam. */
 export async function updateLobby(
   code: string,
   patch: { teamNames?: string[]; teamColors?: string[]; settings?: Settings },
@@ -203,6 +203,31 @@ export async function updateLobby(
         for (const [uid, p] of Object.entries(room.players)) {
           if (p.teamIndex !== null && p.teamIndex >= count) update[`players.${uid}.teamIndex`] = null;
         }
+      }
+      tx.update(roomRef(code), update);
+    }),
+  );
+}
+
+/**
+ * Host: remove one team. Its players go back to "no team", and everyone on a later team
+ * moves down one place, so they stay with the same team name and colour.
+ */
+export async function removeTeam(code: string, index: number) {
+  await withRetry(() =>
+    runTransaction(firebase().db, async (tx) => {
+      const snap = await tx.get(roomRef(code));
+      if (!snap.exists()) return;
+      const room = snap.data() as Room;
+      if (room.teamNames.length <= MIN_TEAMS || index < 0 || index >= room.teamNames.length) return;
+      const update: Record<string, unknown> = {
+        teamNames: room.teamNames.filter((_, i) => i !== index),
+        teamColors: roomColors(room).filter((_, i) => i !== index),
+        updatedAt: serverTimestamp(),
+      };
+      for (const [uid, p] of Object.entries(room.players)) {
+        if (p.teamIndex === index) update[`players.${uid}.teamIndex`] = null;
+        else if (p.teamIndex !== null && p.teamIndex > index) update[`players.${uid}.teamIndex`] = p.teamIndex - 1;
       }
       tx.update(roomRef(code), update);
     }),
