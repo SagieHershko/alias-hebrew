@@ -95,6 +95,8 @@ interface Props {
   sand?: RefObject<SandState>;
   /** Squares drawn as steal squares. */
   stealSquares?: readonly number[];
+  /** Online: the player explaining right now, who holds up a card on the sofa. */
+  explainerId?: string | null;
   /** Bumped every time a card is drawn: a card flies up from the deck. */
   cardsDrawn?: number;
   style?: StyleProp<ViewStyle>;
@@ -181,6 +183,7 @@ function Scene({
   sand,
   cardsDrawn = 0,
   stealSquares = [],
+  explainerId,
 }: SceneProps) {
   const layout = useMemo(() => computeLayout(target), [target]);
   const [discTex, logoTex, cardTex, floorTex] = useLoader(THREE.TextureLoader, [
@@ -222,7 +225,7 @@ function Scene({
         shadow-camera-bottom={-layout.width}
         shadow-bias={-0.0005}
       />
-      <LivingRoom layout={layout} floorTexture={floorTex} sitters={sitters} />
+      <LivingRoom layout={layout} floorTexture={floorTex} sitters={sitters} holderId={explainerId} />
       <BoardBase layout={layout} logo={logoTex} />
       <Discs layout={layout} texture={discTex} view={view} stealSquares={stealSquares} />
       <Decks decks={props.decks} cardTexture={cardTex} />
