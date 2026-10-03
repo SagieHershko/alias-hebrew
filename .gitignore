@@ -42,3 +42,4 @@ yarn-error.*
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+.archify/
