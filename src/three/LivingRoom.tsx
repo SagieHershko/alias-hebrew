@@ -3,7 +3,6 @@ import { useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 
 import type { BoardLayout } from './boardLayout';
-import { SofaSitters, type Sitter } from './SittingPlayer';
 
 /**
  * A cosy "dollhouse" living room around the game table, in the isometric
@@ -303,16 +302,7 @@ function Wall({ position, rotationY, length, height, color, u, children }: WallP
   );
 }
 
-export function LivingRoom({
-  layout,
-  floorTexture,
-  sitters = [],
-}: {
-  layout: BoardLayout;
-  floorTexture: THREE.Texture;
-  /** Online players, seated on the two sofas (in team order, so teammates sit together). */
-  sitters?: Sitter[];
-}) {
+export function LivingRoom({ layout, floorTexture }: { layout: BoardLayout; floorTexture: THREE.Texture }) {
   const t = useMemo(() => tableGeometry(layout), [layout]);
   const u = t.u;
   const R = 34 * u; // half the room width
@@ -330,11 +320,6 @@ export function LivingRoom({
   }, [floorTexture, R, u]);
 
   const at = (x: number, z: number) => new THREE.Vector3(cx + x, floorY, cz + z);
-
-  // Fill both sofas in proportion to their length (44u at the back, 34u at the front).
-  const backCount = Math.round((sitters.length * 44) / 78);
-  const backSitters = sitters.slice(0, backCount);
-  const frontSitters = sitters.slice(backCount);
 
   return (
     <group>
@@ -365,7 +350,6 @@ export function LivingRoom({
         ))}
         <group position={[0, 0, 1 * u]}>
           <Sofa width={44 * u} u={u} chaise />
-          <SofaSitters sitters={backSitters} width={44 * u} u={u} />
         </group>
       </Wall>
 
@@ -412,7 +396,6 @@ export function LivingRoom({
       <Wall position={at(0, R)} rotationY={Math.PI} length={2 * R} height={H} color={WALL_LIGHT} u={u}>
         <group position={[4 * u, 0, 1 * u]}>
           <Sofa width={34 * u} u={u} />
-          <SofaSitters sitters={frontSitters} width={34 * u} u={u} />
         </group>
       </Wall>
     </group>
