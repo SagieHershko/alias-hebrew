@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { currentTeam } from '../../game/gameReducer';
+import { currentExplainer, currentTeam } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
 import { initSounds } from '../../sound/sounds';
-import { Board3D, createView, resetView, type OrbitView, type SandState } from '../../three/Board3D';
+import { Board3D, createView, resetView, toggleRoomView, type OrbitView, type SandState } from '../../three/Board3D';
 import { ScoreboardPanel } from './ScoreboardPanel';
 import { SummaryPanel } from './SummaryPanel';
 import { TurnPanel } from './TurnPanel';
@@ -56,9 +56,15 @@ export function GameStage() {
         fromScores={state.previousScores}
         cardsDrawn={cardFlights}
         stealSquares={state.stealSquares}
+        explainerId={state.phase === 'turn' ? currentExplainer(state)?.id : null}
       />
       <StageInsetsContext.Provider value={insets}>
-        {state.phase === 'scoreboard' && <ScoreboardPanel onResetView={() => resetView(view.current)} />}
+        {state.phase === 'scoreboard' && (
+          <ScoreboardPanel
+            onResetView={() => resetView(view.current)}
+            onRoomView={() => toggleRoomView(view.current)}
+          />
+        )}
         {state.phase === 'turn' && <TurnPanel sand={sand} onCardShown={setCardFlights} />}
         {state.phase === 'summary' && <SummaryPanel />}
         {state.phase === 'winner' && <WinnerPanel />}

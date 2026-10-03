@@ -65,6 +65,18 @@ export const createView = (): OrbitView => ({
   insetBottom: 0,
 });
 
+/** Zoom of the "living room" view: far enough out to see both sofas around the table. */
+const ROOM_ZOOM = 2.6;
+
+/** Swing the camera out to the living room (seeing the players on the sofas), or back. */
+export function toggleRoomView(view: OrbitView) {
+  if (view.zoom === ROOM_ZOOM) return resetView(view);
+  view.azimuth = 0;
+  view.elevation = THREE.MathUtils.degToRad(34);
+  view.zoom = ROOM_ZOOM;
+  view.lastInteraction = Date.now();
+}
+
 export function resetView(view: OrbitView) {
   view.azimuth = null;
   view.elevation = null;
@@ -95,6 +107,8 @@ interface Props {
   sand?: RefObject<SandState>;
   /** Squares drawn as steal squares. */
   stealSquares?: readonly number[];
+  /** Online: the player explaining right now, who holds up a card on the sofa. */
+  explainerId?: string | null;
   /** Bumped every time a card is drawn: a card flies up from the deck. */
   cardsDrawn?: number;
   style?: StyleProp<ViewStyle>;
@@ -181,6 +195,7 @@ function Scene({
   sand,
   cardsDrawn = 0,
   stealSquares = [],
+  explainerId,
 }: SceneProps) {
   const layout = useMemo(() => computeLayout(target), [target]);
   const [discTex, logoTex, cardTex, floorTex] = useLoader(THREE.TextureLoader, [
@@ -194,6 +209,11 @@ function Scene({
     t.anisotropy = 8;
   }
   const props = useMemo(() => propPositions(layout, teams.length), [layout, teams.length]);
+  // Online: every player sits on a sofa in their team's colour.
+  const sitters = useMemo(
+    () => teams.flatMap((t) => (t.players ?? []).map((p) => ({ id: p.id, color: t.color }))),
+    [teams],
+  );
 
   return (
     <>
@@ -217,7 +237,7 @@ function Scene({
         shadow-camera-bottom={-layout.width}
         shadow-bias={-0.0005}
       />
-      <LivingRoom layout={layout} floorTexture={floorTex} />
+      <LivingRoom layout={layout} floorTexture={floorTex} sitters={sitters} holderId={explainerId} />
       <BoardBase layout={layout} logo={logoTex} />
       <Discs layout={layout} texture={discTex} view={view} stealSquares={stealSquares} />
       <Decks decks={props.decks} cardTexture={cardTex} />
