@@ -30,6 +30,9 @@ export function HomeScreen({ onLocal, onOnline }: { onLocal: () => void; onOnlin
           <Text style={styles.note}>כל שחקן מהטלפון שלו · התחברות עם Google · הזמנה בקישור</Text>
         </View>
       </View>
+      <Text style={[styles.credit, { bottom: insets.bottom + 8 }]} accessibilityRole="text">
+        © {new Date().getFullYear()} Developed by Sagie Hershko
+      </Text>
     </View>
   );
 }
@@ -41,6 +44,17 @@ const styles = StyleSheet.create({
   options: { alignSelf: 'center', maxWidth: 460, width: '100%', alignItems: 'stretch', gap: 22 },
   optionsLandscape: { flex: 1, width: 'auto', gap: 14 },
   option: { gap: 8 },
+  // Copyright line pinned to the bottom of the screen, out of the way of the buttons.
+  credit: {
+    position: 'absolute',
+    start: 0,
+    end: 0,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    writingDirection: 'ltr',
+  },
   note: {
     color: colors.white,
     textAlign: 'center',
