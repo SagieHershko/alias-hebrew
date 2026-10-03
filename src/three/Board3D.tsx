@@ -6,6 +6,7 @@ import * as THREE from 'three';
 
 import type { Team } from '../game/types';
 import { TIMER_FLIP_MS } from '../game/gameReducer';
+import { isCompactLandscape } from '../hooks/useCompactLandscape';
 import { playSound } from '../sound/sounds';
 import { computeLayout, type BoardLayout } from './boardLayout';
 import { LivingRoom } from './LivingRoom';
@@ -291,8 +292,11 @@ function CameraRig({ layout, view }: { layout: BoardLayout; view: RefObject<Orbi
     const W = Math.max(1, size.width);
     const H = Math.max(1, size.height);
     const ease = Math.min(1, delta * 6);
-    insets.current.top += (clamp(v.insetTop, 0, H * 0.8) - insets.current.top) * ease;
-    insets.current.bottom += (clamp(v.insetBottom, 0, H * 0.8) - insets.current.bottom) * ease;
+    // A phone on its side is too short to keep the table between the panels: let the panels
+    // float over the room's edges instead, so the room keeps most of the height.
+    const overlap = isCompactLandscape(W, H) ? 0.35 : 1;
+    insets.current.top += (clamp(v.insetTop * overlap, 0, H * 0.8) - insets.current.top) * ease;
+    insets.current.bottom += (clamp(v.insetBottom * overlap, 0, H * 0.8) - insets.current.bottom) * ease;
     const free = Math.max(H * 0.15, H - insets.current.top - insets.current.bottom);
     const freeCenter = insets.current.top + free / 2;
     // Render a taller virtual image centred on the free band (see setViewOffset).

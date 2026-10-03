@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
 import { currentTeam, turnAwards } from '../../game/gameReducer';
 import { useGame } from '../../game/GameContext';
+import { useCompactLandscape } from '../../hooks/useCompactLandscape';
 import { colors, radius, readableOn, RLM } from '../../theme';
 import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
@@ -15,6 +17,16 @@ export function SummaryPanel() {
   const canEdit = !online || online.canControlTurn || online.isHost;
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: false, bottom: true });
+  const landscape = useCompactLandscape();
+  useEffect(() => {
+    // The sheet covers the whole height beside the list; the table needs no room kept free.
+    if (landscape) stage.setBottom(0);
+  }, [stage, landscape]);
+  const confirm = canEdit ? (
+    <BigButton label="אישור והמשך" variant="light" large={!landscape} onPress={() => dispatch({ type: 'CONFIRM_TURN' })} />
+  ) : (
+    <Text style={styles.help}>ממתינים ש{online?.explainer?.name} יאשר/תאשר את התור…</Text>
+  );
   const team = currentTeam(state)!;
   const awards = turnAwards(state.turnWords, state.settings, team.id);
   const points = awards[team.id] ?? 0;
@@ -24,7 +36,18 @@ export function SummaryPanel() {
 
   return (
     <View style={panel.layer} pointerEvents="box-none">
-      <View style={[panel.bottom, styles.sheet, { paddingBottom: insets.bottom + 14 }]} onLayout={stage.onBottomLayout}>
+      <View
+        style={[
+          panel.bottom,
+          styles.sheet,
+          landscape && styles.landscapeSheet,
+          { paddingBottom: insets.bottom + (landscape ? 10 : 14) },
+          landscape && { paddingTop: insets.top + 10 },
+        ]}
+        onLayout={landscape ? undefined : stage.onBottomLayout}
+      >
+        {/* Phone on its side: the totals and the button beside the word list, not above it. */}
+        <View style={landscape ? styles.landscapeInfo : styles.portraitInfo}>
         <Text style={styles.title}>{state.stealTurn ? 'נגמר תור הגניבה!' : 'נגמר הזמן!'}</Text>
         <Text style={styles.subtitle}>
           {RLM}
@@ -38,9 +61,11 @@ export function SummaryPanel() {
           </Text>
         ))}
         {canEdit && <Text style={styles.help}>טעיתם בסימון? הקישו על מילה כדי לשנות</Text>}
+        {landscape && confirm}
+        </View>
 
         <FlatList
-          style={styles.list}
+          style={[styles.list, landscape && styles.landscapeList]}
           contentContainerStyle={styles.listContent}
           data={state.turnWords}
           keyExtractor={(item, i) => `${item.word}-${i}`}
@@ -87,11 +112,7 @@ export function SummaryPanel() {
           }}
         />
 
-        {canEdit ? (
-          <BigButton label="אישור והמשך" variant="light" large onPress={() => dispatch({ type: 'CONFIRM_TURN' })} />
-        ) : (
-          <Text style={styles.help}>ממתינים ש{online?.explainer?.name} יאשר/תאשר את התור…</Text>
-        )}
+        {!landscape && confirm}
       </View>
     </View>
   );
@@ -99,6 +120,10 @@ export function SummaryPanel() {
 
 const styles = StyleSheet.create({
   sheet: { maxHeight: '72%', gap: 6 },
+  landscapeSheet: { top: 0, maxHeight: '100%', flexDirection: 'row', gap: 16, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
+  portraitInfo: { gap: 6 },
+  landscapeInfo: { flex: 1, gap: 6, justifyContent: 'center' },
+  landscapeList: { flex: 1.3, alignSelf: 'stretch' },
   title: { flexShrink: 0, fontSize: 32, fontWeight: '900', color: colors.white, textAlign: 'center' },
   subtitle: { flexShrink: 0, fontSize: 20, fontWeight: '800', color: colors.white, textAlign: 'center' },
   help: { flexShrink: 0, fontSize: 14, color: colors.offWhite, textAlign: 'center', marginBottom: 4 },

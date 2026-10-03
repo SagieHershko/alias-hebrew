@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BigButton } from '../../components/BigButton';
 import { useGame } from '../../game/GameContext';
+import { useCompactLandscape } from '../../hooks/useCompactLandscape';
 import { playSound } from '../../sound/sounds';
 import { colors } from '../../theme';
 import { panel } from './panel';
@@ -16,6 +17,8 @@ export function WinnerPanel() {
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: false, bottom: true });
   const winner = state.teams.find((t) => t.id === state.winnerId);
+  // Phone on its side: a smaller trophy and buttons, so the sheet fits the short screen.
+  const landscape = useCompactLandscape();
 
   // Fanfare and cheers once, when the winner is announced.
   useEffect(() => {
@@ -25,7 +28,7 @@ export function WinnerPanel() {
   return (
     <View style={panel.layer} pointerEvents="box-none">
       <View style={[panel.bottom, styles.sheet, { paddingBottom: insets.bottom + 14 }]} onLayout={stage.onBottomLayout}>
-        <Text style={styles.trophy}>🏆</Text>
+        <Text style={[styles.trophy, landscape && styles.trophySmall]}>🏆</Text>
         <Text style={styles.title}>יש לנו מנצחים!</Text>
         <View style={[styles.winnerPill, { borderColor: winner?.color ?? colors.gold }]}>
           <Text style={styles.winnerName}>{winner?.name}</Text>
@@ -33,7 +36,7 @@ export function WinnerPanel() {
         <Text style={panel.hint}>הגיעו ראשונים ל✌ אחרי {state.round} סיבובים</Text>
         {canRestart ? (
           <>
-            <BigButton label="משחק חוזר" variant="primary" large onPress={() => dispatch({ type: 'REMATCH' })} />
+            <BigButton label="משחק חוזר" variant="primary" large={!landscape} onPress={() => dispatch({ type: 'REMATCH' })} />
             <BigButton
               label={online ? 'חזרה ללובי' : 'קבוצות חדשות'}
               variant="ghost"
@@ -54,6 +57,7 @@ export function WinnerPanel() {
 const styles = StyleSheet.create({
   sheet: { alignItems: 'stretch' },
   trophy: { fontSize: 56, textAlign: 'center' },
+  trophySmall: { fontSize: 32 },
   title: { fontSize: 32, fontWeight: '900', color: colors.white, textAlign: 'center' },
   winnerPill: {
     alignSelf: 'center',
