@@ -12,7 +12,7 @@ import { panel } from './panel';
 import { useStageInsets } from './stageInsets';
 
 /** Between turns: standings on top, whose turn it is and the start button at the bottom. */
-export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
+export function ScoreboardPanel({ onResetView, onRoomView }: { onResetView: () => void; onRoomView: () => void }) {
   const { state, dispatch, online } = useGame();
   const insets = useSafeAreaInsets();
   const stage = useStageInsets({ top: true, bottom: true });
@@ -46,10 +46,25 @@ export function ScoreboardPanel({ onResetView }: { onResetView: () => void }) {
         <View style={panel.row}>
           <View style={panel.flex}>
             <View style={panel.pill}>
-              <Text style={panel.title}>סיבוב {state.round}</Text>
-              <Text style={panel.subtitle}>משבצת הסיום: {state.settings.targetScore}</Text>
+              <Text style={panel.title} numberOfLines={1}>
+                סיבוב {state.round}
+              </Text>
+              <Text style={panel.subtitle} numberOfLines={1}>
+                משבצת הסיום: {state.settings.targetScore}
+              </Text>
             </View>
           </View>
+          {/* Online: swing out to the living room to see everyone on the sofas (and back). */}
+          {online && (
+            <Pressable
+              onPress={onRoomView}
+              style={panel.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="מבט על הסלון והשחקנים"
+            >
+              <Text style={panel.iconText}>🛋️</Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={onResetView}
             style={panel.iconBtn}

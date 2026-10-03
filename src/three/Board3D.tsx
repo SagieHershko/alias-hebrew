@@ -65,6 +65,18 @@ export const createView = (): OrbitView => ({
   insetBottom: 0,
 });
 
+/** Zoom of the "living room" view: far enough out to see both sofas around the table. */
+const ROOM_ZOOM = 2.6;
+
+/** Swing the camera out to the living room (seeing the players on the sofas), or back. */
+export function toggleRoomView(view: OrbitView) {
+  if (view.zoom === ROOM_ZOOM) return resetView(view);
+  view.azimuth = 0;
+  view.elevation = THREE.MathUtils.degToRad(34);
+  view.zoom = ROOM_ZOOM;
+  view.lastInteraction = Date.now();
+}
+
 export function resetView(view: OrbitView) {
   view.azimuth = null;
   view.elevation = null;
